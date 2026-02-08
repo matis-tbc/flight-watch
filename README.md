@@ -15,7 +15,7 @@ Scope (v1)
 Out of scope (v1)
 - Full user accounts (optional)
 - Payments
-- Mobile app
+- Mobile app!
 
 Tech stack (current)
 - Frontend: React
