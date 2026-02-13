@@ -1,0 +1,15 @@
+2026-02-11 19:50:52,775 - ERROR - Failed to authenticate with Amadeus API: AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET environment variables must be set
+2026-02-11 19:50:52,775 - ERROR - Script execution failed: AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET environment variables must be set
+2026-02-11 19:52:28,191 - ERROR - Failed to authenticate with Amadeus API: AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET environment variables must be set
+2026-02-11 19:52:28,192 - ERROR - Script execution failed: AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET environment variables must be set
+2026-02-11 19:52:45,425 - ERROR - Failed to authenticate with Amadeus API: AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET environment variables must be set
+2026-02-11 19:52:45,425 - ERROR - Script execution failed: AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET environment variables must be set
+2026-02-11 19:52:53,079 - ERROR - Failed to authenticate with Amadeus API: AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET environment variables must be set
+2026-02-11 19:52:53,079 - ERROR - Script execution failed: AMADEUS_CLIENT_ID and AMADEUS_CLIENT_SECRET environment variables must be set
+2026-02-11 19:53:57,672 - INFO - Successfully authenticated with Amadeus API
+2026-02-11 19:53:57,673 - INFO - Searching flights from ORD to LAX
+2026-02-11 19:53:58,266 - ERROR - Amadeus API error: [---]
+2026-02-11 19:53:58,266 - ERROR - Script execution failed: [---]
+2026-02-11 21:20:49,684 - INFO - Successfully authenticated with Amadeus API
+2026-02-11 21:20:49,684 - INFO - Searching flights from ORD to LAX
+2026-02-11 21:20:58,141 - INFO - Successfully retrieved flight offers for ORD to LAX
