@@ -53,7 +53,8 @@ def search_flights(amadeus_client, origin, destination, departure_date, return_d
             'originLocationCode': origin,
             'destinationLocationCode': destination,
             'departureDate': departure_date,
-            'adults': passengers
+            'adults': passengers,
+            'currencyCode':'USD'
         }
 
         if return_date:
