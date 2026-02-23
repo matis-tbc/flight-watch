@@ -1,0 +1,11 @@
+# FlightWatch Backend Dependencies
+fastapi==0.104.1
+uvicorn==0.24.0
+sqlalchemy==2.0.23
+python-dotenv==1.0.0
+amadeus==7.0.0
+
+# GCP Cloud Storage support (optional - for team's GCS data)
+google-cloud-storage==2.16.0
+# Note: pandas removed due to Python 3.13 compatibility issues
+# Use csv module instead for simple CSV parsing
