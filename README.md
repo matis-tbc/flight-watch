@@ -18,12 +18,12 @@ Out of scope (v1)
 - Mobile app!
 
 Tech stack (current)
-- Frontend: React
+- Frontend: Vanilla HTML/JS (served statically by FastAPI)
 - Backend: FastAPI (Python)
-- DB: PostgreSQL + SQLAlchemy
-- Scheduler: cron (or Celery + Redis)
-- Flight API: Amadeus (fallbacks later)
-- Email: SendGrid / SES / Gmail SMTP
+- Data Source: Google Cloud Storage (CSV batch data), Amadeus API (live flight data), Mock data
+- DB: PostgreSQL + SQLAlchemy (Planned)
+- Scheduler: cron, Celery + Redis (Planned)
+- Email: SendGrid / SES / Gmail SMTP (Planned)
 
 Repo map
 - docs/          Product docs, decisions, meetings
