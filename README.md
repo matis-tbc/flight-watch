@@ -40,6 +40,27 @@ Lanes
 - E Frontend: search, track, chart, states
 - F QA/DevOps: env, secrets, deploy, tests
 
+## Local Setup (Quick Start)
+
+1. **Get GCP access** - Ask a teammate for the service account key file (`service-account-key.json`).
+2. **Place the key** in the `backend/` directory.
+3. **Copy environment config**:
+   ```bash
+   cd backend
+   cp .env.example .env
+   ```
+4. **Update `.env`**: Make sure `GCS_BUCKET` and `GCS_FILE_PATH` are set correctly.
+5. **Run the backend**:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   python3 app_simple_gcs.py
+   ```
+6. **Access the Application**: 
+   - API: http://localhost:8000
+   - Frontend: http://localhost:8000/frontend/simple_search.html
+
 Next steps
 - Create repo structure (done here)
 - Lock tech stack with professor
