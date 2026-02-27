@@ -9,3 +9,8 @@ amadeus==7.0.0
 google-cloud-storage==2.16.0
 # Note: pandas removed due to Python 3.13 compatibility issues
 # Use csv module instead for simple CSV parsing
+
+flask
+gunicorn
+google-cloud-firestore
+sendgrid

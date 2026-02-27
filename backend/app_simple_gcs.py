@@ -8,7 +8,16 @@ import sys
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-load_dotenv()
+BASE_DIR = os.path.dirname(__file__)
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+
+credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+if credentials_path:
+    normalized_credentials_path = credentials_path.strip()
+    if not os.path.isabs(normalized_credentials_path):
+        normalized_credentials_path = os.path.join(BASE_DIR, normalized_credentials_path)
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath(normalized_credentials_path)
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'scripts', 'flight_fetch'))
 
 try:

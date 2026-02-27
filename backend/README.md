@@ -35,12 +35,13 @@ API runs at http://localhost:8000
 - `GET /api/tracks` - List tracked flights
 - `POST /api/tracks` - Add a flight to track
 - `DELETE /api/tracks/{id}` - Remove a tracked flight
+- `POST /internal/ingest` - Scheduler-only ingestion from Amadeus -> GCS raw archive + Firestore routes/history
 - `GET /docs` - Interactive API documentation
 
 ## Data Source
 
 Real flight data loaded from Google Cloud Storage:
-- Bucket: `flight-batch-v1`
+- Bucket:`flight-batch-v1`
 - File: `flight_data_batch.csv`
 - Records: 52,529 flights
 - Airports: 82 origins, 84 destinations
@@ -68,7 +69,61 @@ GCP_PROJECT_ID=flightwatch-486618
 GCS_BUCKET=flight-batch-v1
 GCS_FILE_PATH=flight_data_batch.csv
 GOOGLE_APPLICATION_CREDENTIALS=service-account-key.json
+AMADEUS_CLIENT_ID=...
+AMADEUS_CLIENT_SECRET=...
+INGEST_RAW_BUCKET=... # optional fallback is GCS_BUCKET
+INGEST_RAW_PREFIX=raw
+INGEST_MAX_OFFERS=20
+INGEST_MAX_RETRIES=3
+SCHEDULER_TOKEN=...
 ```
+
+## Cloud Scheduler Setup (Ingestion)
+
+Use Cloud Scheduler to call `POST /internal/ingest` on your deployed backend.
+
+```bash
+# set these for your environment
+PROJECT_ID="flightwatch-486618"
+REGION="us-central1"
+JOB_NAME="flightwatch-ingest"
+SERVICE_URL="https://YOUR_CLOUD_RUN_URL/internal/ingest"
+SCHEDULER_TOKEN="replace-with-strong-random-token"
+CRON_SCHEDULE="*/15 * * * *"
+```
+
+Create the job:
+
+```bash
+gcloud scheduler jobs create http "$JOB_NAME" \
+  --project="$PROJECT_ID" \
+  --location="$REGION" \
+  --schedule="$CRON_SCHEDULE" \
+  --time-zone="America/New_York" \
+  --uri="$SERVICE_URL" \
+  --http-method=POST \
+  --headers="Content-Type=application/json,X-Scheduler-Token=$SCHEDULER_TOKEN" \
+  --message-body='{}'
+```
+
+Run immediately (manual test):
+
+```bash
+gcloud scheduler jobs run "$JOB_NAME" \
+  --project="$PROJECT_ID" \
+  --location="$REGION"
+```
+
+Update existing schedule:
+
+```bash
+gcloud scheduler jobs update http "$JOB_NAME" \
+  --project="$PROJECT_ID" \
+  --location="$REGION" \
+  --schedule="0 * * * *"
+```
+
+The backend checks `X-Scheduler-Token` against `SCHEDULER_TOKEN` from environment.
 
 ## Troubleshooting
 
