@@ -1,10 +1,40 @@
-FROM python:3.11
+# dockerfile — FlightWatch backend
+#
+# Runs TWO services from the same image (controlled by CMD):
+#
+#   Default (Cloud Run / scheduler service):
+#     gunicorn scheduler:app   →  serves /check-prices + /internal/ingest
+#
+#   Override for FastAPI (app_simple_gcs.py):
+#     uvicorn app_simple_gcs:app --host 0.0.0.0 --port 8000
+#
+# Python 3.11 — matches requirements.txt (avoids 3.13 pandas issues)
+
+FROM python:3.11-slim
 
 WORKDIR /app
 
+# Install system deps needed by some GCP / ML packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies first (layer cache friendly)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy the entire backend directory
 COPY . .
 
-CMD exec gunicorn --bind :8080 --workers 1 --threads 8 scheduler:app
+# Also expose scripts/flight_fetch so app_simple_gcs.py can import flight_fetcher
+# (matches: sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'scripts', 'flight_fetch')))
+RUN mkdir -p ./scripts/flight_fetch
+
+EXPOSE 8080
+
+# Default: run the Flask scheduler service (consumed by Cloud Scheduler)
+# To run the FastAPI app instead, override CMD:
+#   docker run ... python app_simple_gcs.py
+#   docker run ... uvicorn app_simple_gcs:app --host 0.0.0.0 --port 8000
+CMD exec gunicorn --bind :8080 --workers 1 --threads 8 --timeout 120 scheduler:app
