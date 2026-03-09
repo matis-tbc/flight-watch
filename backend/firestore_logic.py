@@ -25,22 +25,86 @@ if credentials_path:
 
 db = firestore.Client()
 
+
 def get_tracked_flights():
-    """Stream all docs from tracked_flights collection."""
+    """Stream all docs from tracked_flights collection.
+    Called by scheduler.py /check-prices to find which users to email.
+    """
     return db.collection("tracked_flights").stream()
+
+
+def create_tracked_flight(
+    user_email: str,
+    origin: str,
+    destination: str,
+    departure_date: str,
+    latest_price: float,
+    return_date: str = None,
+):
+    """
+    Save a new tracked flight to Firestore.
+    Called by app_simple_gcs.py POST /api/tracks when a user tracks a flight.
+
+    This is what feeds the scheduler — without docs here,
+    no price checks or emails will ever run.
+
+    Args:
+        user_email:     the user who wants to be alerted
+        origin:         e.g. JFK
+        destination:    e.g. CDG
+        departure_date: e.g. 2026-04-01
+        latest_price:   the price at the time of tracking — used as baseline
+                        for future price drop comparisons
+        return_date:    optional, e.g. 2026-04-10
+    """
+    doc_data = {
+        "user_email": user_email,
+        "origin": origin.strip().upper(),
+        "destination": destination.strip().upper(),
+        "departure_date": departure_date,
+        "return_date": return_date,
+        "latest_price": latest_price,
+        "previous_price": None,
+        "last_checked": None,
+        "created_at": firestore.SERVER_TIMESTAMP,
+    }
+    # Auto-generate doc ID
+    _, doc_ref = db.collection("tracked_flights").add(doc_data)
+    return doc_ref.id
+
+
+def delete_tracked_flight(doc_id: str):
+    """
+    Remove a tracked flight from Firestore.
+    Called by app_simple_gcs.py DELETE /api/tracks/{id}
+    """
+    db.collection("tracked_flights").document(doc_id).delete()
+
+
+def get_tracked_flights_by_email(user_email: str):
+    """
+    Get all flights tracked by a specific user.
+    Useful for showing a user their own tracked flights in the frontend.
+    """
+    return (
+        db.collection("tracked_flights")
+        .where("user_email", "==", user_email)
+        .stream()
+    )
+
 
 def update_price(doc_ref, new_price, current_price):
     """
-    Update price on a tracked flight doc.
+    Update price on a tracked flight doc after scheduler checks it.
 
     Args:
-        doc_ref:       Firestore DocumentReference for the tracked flight
-        new_price:     latest price fetched from GCS (float)
-        current_price: the existing latest_price already in memory from scheduler.py
+        doc_ref:       Firestore DocumentReference
+        new_price:     latest price from GCS
+        current_price: existing latest_price already in memory from scheduler.py
                        — passed in to avoid an extra Firestore read
     """
     doc_ref.update({
         "previous_price": current_price,
         "latest_price": new_price,
-        "last_checked": firestore.SERVER_TIMESTAMP
+        "last_checked": firestore.SERVER_TIMESTAMP,
     })

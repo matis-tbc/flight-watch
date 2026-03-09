@@ -301,33 +301,56 @@ async def create_track(
     origin: str,
     destination: str,
     departure_date: str,
+    user_email: str,                      # required — scheduler needs this to send emails
     return_date: Optional[str] = None,
     max_price: Optional[float] = None,
-    notification_email: Optional[str] = None
 ):
-    """Create a new flight price tracking"""
-    global track_id_counter
-    
-    track = {
-        "id": track_id_counter,
-        "origin": origin,
-        "destination": destination,
+    """
+    Track a flight — saves to Firestore so the scheduler can monitor it.
+    The current price from GCS is fetched and stored as the baseline.
+    When the scheduler runs and detects a lower price, it emails user_email.
+    """
+    from firestore_logic import create_tracked_flight
+
+    if not user_email:
+        raise HTTPException(status_code=400, detail="user_email is required to receive price drop alerts.")
+
+    # Fetch current price from GCS to use as the baseline for future comparisons
+    flights = gcs_data_service_simple.search_flights(
+        origin=origin,
+        destination=destination,
+        departure_date=departure_date,
+        limit=1,
+    )
+
+    latest_price = None
+    if flights:
+        raw = flights[0].get("price")
+        if isinstance(raw, dict):
+            raw = raw.get("total")
+        try:
+            latest_price = float(str(raw).replace(",", "").strip()) if raw else None
+        except (TypeError, ValueError):
+            latest_price = None
+
+    doc_id = create_tracked_flight(
+        user_email=user_email,
+        origin=origin,
+        destination=destination,
+        departure_date=departure_date,
+        latest_price=latest_price,
+        return_date=return_date,
+    )
+
+    return {
+        "message": "Flight is now being tracked. You'll be emailed if the price drops.",
+        "doc_id": doc_id,
+        "user_email": user_email,
+        "origin": origin.upper(),
+        "destination": destination.upper(),
         "departure_date": departure_date,
         "return_date": return_date,
-        "max_price": max_price,
-        "notification_email": notification_email,
-        "created_at": datetime.now().isoformat(),
-        "status": "active",
-        "price_history": []
-    }
-    
-    tracks_db.append(track)
-    track_id_counter += 1
-    
-    return {
-        "message": "Track created successfully",
-        "track": track,
-        "track_id": track["id"]
+        "baseline_price": latest_price,
     }
 
 @app.get("/api/tracks")
