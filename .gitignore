@@ -53,3 +53,6 @@ out/
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Other
+*sandbox*
