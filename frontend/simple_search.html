@@ -1195,7 +1195,6 @@
             <div id="explorer-progress" style="display: none; margin-top: 12px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                     <span id="explorer-progress-text" style="color: #666; font-size: 0.88rem;">Mapping destinations...</span>
-                    <button class="search-btn secondary" id="skip-animation-btn" type="button" style="padding: 6px 14px; font-size: 0.82rem; margin: 0; grid-column: auto;">Skip animation</button>
                 </div>
                 <div style="background: #e5e7eb; border-radius: 999px; height: 6px; overflow: hidden;">
                     <div id="explorer-progress-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #667eea, #764ba2); border-radius: 999px; transition: width 0.3s ease;"></div>
@@ -2017,7 +2016,6 @@
         let explorerDestGeoData = {};
         let explorerOriginCode = '';
         let isExploring = false;
-        let skipAnimation = false;
 
         function openExplorer() {
             const overlay = document.getElementById('explorer-overlay');
@@ -2114,10 +2112,6 @@
             showSuggestions('explorer-origin', 'explorer-suggestions', e.target.value);
         });
 
-        document.getElementById('skip-animation-btn').addEventListener('click', () => {
-            skipAnimation = true;
-        });
-
         document.getElementById('explore-btn').addEventListener('click', async () => {
             if (isExploring) return;
 
@@ -2133,7 +2127,6 @@
             }
 
             isExploring = true;
-            skipAnimation = false;
             explorerOriginCode = origin;
             const btn = document.getElementById('explore-btn');
             btn.disabled = true;
@@ -2212,9 +2205,11 @@
                 progressText.textContent = `Mapping ${dest.destination} (${i + 1}/${total})...`;
 
                 try {
-                    if (!geoCache.has(dest.destination) && !skipAnimation) {
-                        await new Promise(r => setTimeout(r, 180));
-                    }
+                    // Always delay so markers appear one by one (animation effect)
+                    // Cached geocodes still get a small delay for visual pacing
+                    const delay = geoCache.has(dest.destination) ? 60 : 200;
+                    await new Promise(r => setTimeout(r, delay));
+
                     const geo = await geocodeAirport(dest.destination);
                     explorerDestGeoData[dest.destination] = geo;
                     const tier = getTier(dest.cheapest_price, maxBudget);
@@ -2234,10 +2229,10 @@
                     // Route line from origin
                     if (allBounds.length > 1) {
                         const pts = greatCirclePoints(allBounds[0][0], allBounds[0][1], geo.lat, geo.lon, 40);
-                        const line = L.polyline(pts, { weight: 1.5, opacity: 0.15, color }).addTo(explorerMap);
+                        const line = L.polyline(pts, { weight: 2, opacity: 0.4, color }).addTo(explorerMap);
                         explorerMarkers.push(line);
                     }
-                } catch (e) { /* skip */ }
+                } catch (e) { /* skip destinations that fail geocoding */ }
             }
 
             progressEl.style.display = 'none';
@@ -2276,32 +2271,35 @@
                 `;
             }).join('');
 
-            // Card click: zoom to destination on map + expand detail
-            container.querySelectorAll('.dest-card').forEach(card => {
-                card.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('dest-search-btn')) return;
-                    const dest = card.dataset.dest;
-                    const isActive = card.classList.contains('active');
-
-                    if (isActive) {
-                        card.classList.remove('active');
-                        document.getElementById('explorer-show-all-btn').style.display = 'none';
-                        showAllDestinations();
-                    } else {
-                        zoomToDestination(dest);
-                        document.getElementById('explorer-show-all-btn').style.display = 'inline-flex';
-                    }
-                });
-            });
-
-            // "Search this route" button: populate main search and close
-            container.querySelectorAll('.dest-search-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    document.getElementById('origin').value = btn.dataset.origin;
-                    document.getElementById('destination').value = btn.dataset.dest;
+            // Single delegated click handler for cards and search buttons
+            container.addEventListener('click', (e) => {
+                // "Search this route" button
+                const searchBtn = e.target.closest('.dest-search-btn');
+                if (searchBtn) {
+                    document.getElementById('origin').value = searchBtn.dataset.origin;
+                    document.getElementById('destination').value = searchBtn.dataset.dest;
                     closeExplorer();
-                });
+                    return;
+                }
+
+                // Card click: zoom + expand
+                const card = e.target.closest('.dest-card');
+                if (!card) return;
+
+                const dest = card.dataset.dest;
+                const wasActive = card.classList.contains('active');
+
+                // Deselect all cards first
+                container.querySelectorAll('.dest-card.active').forEach(c => c.classList.remove('active'));
+
+                if (wasActive) {
+                    document.getElementById('explorer-show-all-btn').style.display = 'none';
+                    showAllDestinations();
+                } else {
+                    card.classList.add('active');
+                    zoomToDestination(dest);
+                    document.getElementById('explorer-show-all-btn').style.display = 'inline-flex';
+                }
             });
 
             document.getElementById('explorer-results-title').textContent = `Destinations from ${data.origin}`;
