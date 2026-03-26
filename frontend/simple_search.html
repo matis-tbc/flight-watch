@@ -899,7 +899,9 @@
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:8000/api';
+        const API_BASE = window.location.protocol === 'file:'
+            ? 'http://localhost:8000/api'
+            : '/api';
         let allAirports = [];
         let latestSearchData = null;
 
@@ -1011,7 +1013,9 @@
             const q = encodeURIComponent(`${code} airport`);
             const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`;
 
-            const res = await fetch(url);
+            const res = await fetch(url, {
+                headers: { 'User-Agent': 'FlightWatch/1.0 (student project)' }
+            });
             if (!res.ok) throw new Error(`Geocode failed for ${code}`);
             const data = await res.json();
             if (!data || data.length === 0) throw new Error(`No map location found for ${code}`);
@@ -1212,7 +1216,10 @@
             await runPurchaseGuidance(latestSearchData);
         });
 
+        let isSearching = false;
         document.getElementById('search-button').addEventListener('click', async () => {
+            if (isSearching) return;
+
             const origin = document.getElementById('origin').value.trim().toUpperCase();
             const destination = document.getElementById('destination').value.trim().toUpperCase();
             const departureDate = document.getElementById('departure-date').value;
@@ -1226,14 +1233,19 @@
             // Only enforce “in database” checks if we actually have the airports list
             // (If GCS isn't configured, /api/airports may not work, but /api/search can still work via Amadeus/mock.)
             if (allAirports.length > 0 && !allAirports.includes(origin)) {
-                showStatus(`Airport code "${origin}" not found in database`, 'error');
+                showStatus(`Airport code “${origin}” not found in database`, 'error');
                 return;
             }
 
             if (allAirports.length > 0 && !allAirports.includes(destination)) {
-                showStatus(`Airport code "${destination}" not found in database`, 'error');
+                showStatus(`Airport code “${destination}” not found in database`, 'error');
                 return;
             }
+
+            isSearching = true;
+            const searchBtn = document.getElementById('search-button');
+            searchBtn.disabled = true;
+            searchBtn.style.opacity = '0.6';
 
             // Plot route on the map immediately (even if no flights found)
             plotRoute(origin, destination);
@@ -1251,6 +1263,12 @@
                 });
 
                 const response = await fetch(`${API_BASE}/search?${params}`);
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => null);
+                    throw new Error(errorData?.detail || `Server error (${response.status})`);
+                }
+
                 const data = await response.json();
                 showLoading(false);
 
@@ -1272,6 +1290,10 @@
                 showLoading(false);
                 showStatus(`Error: ${error.message}`, 'error');
                 console.error('Search error:', error);
+            } finally {
+                isSearching = false;
+                searchBtn.disabled = false;
+                searchBtn.style.opacity = '';
             }
         });
 
@@ -1289,6 +1311,10 @@
         function hideAdvisor(note = 'Waiting for a route search') {
             document.getElementById('advisor-panel').style.display = 'none';
             document.getElementById('advisor-note').textContent = note;
+        }
+
+        function getCurrency(flight) {
+            return flight.currency || (flight.price && flight.price.currency) || 'USD';
         }
 
         function normalizePrice(flight) {
@@ -1324,17 +1350,20 @@
         }
 
         function daysUntil(dateString) {
-            const today = new Date();
-            const target = new Date(`${dateString}T12:00:00`);
-            const diffMs = target - today;
-            return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const todayMs = new Date(`${todayStr}T00:00:00`).getTime();
+            const targetMs = new Date(`${dateString}T00:00:00`).getTime();
+            return Math.max(0, Math.round((targetMs - todayMs) / (1000 * 60 * 60 * 24)));
         }
+
+        let detectedCurrency = 'USD';
 
         function formatCurrency(value) {
             const amount = Number(value || 0);
             return new Intl.NumberFormat('en-US', {
                 style: 'currency',
-                currency: 'USD',
+                currency: detectedCurrency,
                 maximumFractionDigits: 0
             }).format(amount);
         }
@@ -1397,6 +1426,22 @@
         function heuristicPrediction(payload) {
             const best = payload.current_best_price || 0;
             const avg = payload.current_avg_price || best;
+
+            if (best <= 0) {
+                return {
+                    recommendation: 'NO DATA',
+                    confidence: 0,
+                    predicted_lowest_price: 0,
+                    expected_dip_window: 'No pricing data available',
+                    estimated_savings: 0,
+                    rationale: 'No valid prices were found for this route. Try a different date or route.',
+                    model_status: 'frontend-heuristic-placeholder',
+                    price_floor: 0,
+                    price_ceiling: 0,
+                    current_best_price: 0,
+                    source_mode: 'heuristic'
+                };
+            }
             const spread = payload.current_price_spread || 0;
             const volatility = payload.volatility_score || 0;
             const days = payload.days_until_departure || 0;
@@ -1525,6 +1570,11 @@
             const titleEl = document.getElementById('results-title');
             const countEl = document.getElementById('results-count');
             const stats = getFlightStats(data.flights || []);
+
+            // Detect currency from the first flight with one
+            if (data.flights.length > 0) {
+                detectedCurrency = getCurrency(data.flights[0]);
+            }
 
             titleEl.textContent = `Flights: ${data.origin} → ${data.destination}`;
             countEl.textContent = `${data.flights.length} flights`;
