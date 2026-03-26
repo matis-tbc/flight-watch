@@ -917,6 +917,49 @@
             box-shadow: inset 0 0 0 1px #ececf3;
         }
 
+        .dest-card.active {
+            background: #ffffff;
+            border-left-color: #764ba2;
+            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.15);
+        }
+
+        .dest-detail {
+            display: none;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #f0f0f0;
+            font-size: 0.85rem;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .dest-card.active .dest-detail {
+            display: block;
+        }
+
+        .dest-detail-row {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .dest-search-btn {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: 1.5px solid #667eea;
+            background: white;
+            color: #667eea;
+            font-weight: 700;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: background 0.18s ease;
+        }
+
+        .dest-search-btn:hover {
+            background: #f7f8ff;
+        }
+
         .dest-code {
             font-size: 1.3rem;
             font-weight: 700;
@@ -1149,6 +1192,16 @@
             <div class="loading" id="explorer-loading">Searching destinations...</div>
             <div class="status" id="explorer-status"></div>
 
+            <div id="explorer-progress" style="display: none; margin-top: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span id="explorer-progress-text" style="color: #666; font-size: 0.88rem;">Mapping destinations...</span>
+                    <button class="search-btn secondary" id="skip-animation-btn" type="button" style="padding: 6px 14px; font-size: 0.82rem; margin: 0; grid-column: auto;">Skip animation</button>
+                </div>
+                <div style="background: #e5e7eb; border-radius: 999px; height: 6px; overflow: hidden;">
+                    <div id="explorer-progress-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #667eea, #764ba2); border-radius: 999px; transition: width 0.3s ease;"></div>
+                </div>
+            </div>
+
             <div id="explorer-map-wrap" style="margin-top: 16px;">
                 <div id="explorer-map"></div>
             </div>
@@ -1156,7 +1209,10 @@
             <div id="explorer-results-wrap" style="display: none; margin-top: 16px;">
                 <div class="explorer-results-header">
                     <h3 id="explorer-results-title">Destinations</h3>
-                    <span class="summary-chip" id="explorer-dest-count">0 destinations</span>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span class="summary-chip" id="explorer-dest-count">0 destinations</span>
+                        <button class="search-btn secondary" id="explorer-show-all-btn" type="button" style="padding: 6px 14px; font-size: 0.82rem; margin: 0; grid-column: auto; display: none;">Show all</button>
+                    </div>
                 </div>
                 <div class="explorer-results" id="explorer-destinations"></div>
             </div>
@@ -1958,7 +2014,10 @@
         // ── Budget Explorer ──────────────────────────────────────────────
         let explorerMap = null;
         let explorerMarkers = [];
+        let explorerDestGeoData = {};
+        let explorerOriginCode = '';
         let isExploring = false;
+        let skipAnimation = false;
 
         function openExplorer() {
             const overlay = document.getElementById('explorer-overlay');
@@ -1989,6 +2048,7 @@
         function clearExplorerMarkers() {
             explorerMarkers.forEach(m => explorerMap.removeLayer(m));
             explorerMarkers = [];
+            explorerDestGeoData = {};
         }
 
         function getTier(price, maxBudget) {
@@ -2009,12 +2069,36 @@
             return 'Near budget';
         }
 
+        function zoomToDestination(destCode) {
+            const geo = explorerDestGeoData[destCode];
+            if (!geo || !explorerMap) return;
+            explorerMap.flyTo([geo.lat, geo.lon], 6, { duration: 0.8 });
+
+            // Highlight the active card
+            document.querySelectorAll('.dest-card').forEach(c => c.classList.remove('active'));
+            const card = document.querySelector(`.dest-card[data-dest="${destCode}"]`);
+            if (card) {
+                card.classList.add('active');
+                card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        function showAllDestinations() {
+            document.querySelectorAll('.dest-card').forEach(c => c.classList.remove('active'));
+            document.getElementById('explorer-show-all-btn').style.display = 'none';
+            if (Object.keys(explorerDestGeoData).length > 0) {
+                const bounds = Object.values(explorerDestGeoData).map(g => [g.lat, g.lon]);
+                explorerMap.flyToBounds(bounds, { padding: [30, 30], duration: 0.6 });
+            }
+        }
+
         document.getElementById('budget-slider').addEventListener('input', (e) => {
             document.getElementById('budget-value').textContent = `$${e.target.value}`;
         });
 
         document.getElementById('budget-explorer-btn').addEventListener('click', openExplorer);
         document.getElementById('explorer-close-btn').addEventListener('click', closeExplorer);
+        document.getElementById('explorer-show-all-btn').addEventListener('click', showAllDestinations);
 
         document.getElementById('explorer-overlay').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) closeExplorer();
@@ -2028,6 +2112,10 @@
 
         document.getElementById('explorer-origin').addEventListener('input', (e) => {
             showSuggestions('explorer-origin', 'explorer-suggestions', e.target.value);
+        });
+
+        document.getElementById('skip-animation-btn').addEventListener('click', () => {
+            skipAnimation = true;
         });
 
         document.getElementById('explore-btn').addEventListener('click', async () => {
@@ -2045,11 +2133,15 @@
             }
 
             isExploring = true;
+            skipAnimation = false;
+            explorerOriginCode = origin;
             const btn = document.getElementById('explore-btn');
             btn.disabled = true;
             btn.style.opacity = '0.6';
             document.getElementById('explorer-loading').style.display = 'block';
             document.getElementById('explorer-status').style.display = 'none';
+            document.getElementById('explorer-results-wrap').style.display = 'none';
+            document.getElementById('explorer-progress').style.display = 'none';
 
             try {
                 const params = new URLSearchParams({ origin, max_price: maxPrice });
@@ -2083,6 +2175,7 @@
                 isExploring = false;
                 btn.disabled = false;
                 btn.style.opacity = '';
+                document.getElementById('explorer-progress').style.display = 'none';
             }
         });
 
@@ -2090,27 +2183,40 @@
             clearExplorerMarkers();
             const maxBudget = data.max_price;
             const allBounds = [];
+            const progressEl = document.getElementById('explorer-progress');
+            const progressBar = document.getElementById('explorer-progress-bar');
+            const progressText = document.getElementById('explorer-progress-text');
+            const total = data.destinations.length;
+
+            progressEl.style.display = 'block';
+            progressBar.style.width = '0%';
 
             // Origin marker
             try {
                 const orig = await geocodeAirport(data.origin);
                 const originMarker = L.circleMarker([orig.lat, orig.lon], {
                     radius: 10, fillColor: '#667eea', fillOpacity: 1, color: '#fff', weight: 2
-                }).addTo(explorerMap).bindPopup(escapeHtml(data.origin));
+                }).addTo(explorerMap).bindPopup(`<strong>${escapeHtml(data.origin)}</strong><br>Your origin`);
                 explorerMarkers.push(originMarker);
                 allBounds.push([orig.lat, orig.lon]);
-            } catch (e) { /* skip if geocode fails */ }
+                explorerDestGeoData[data.origin] = orig;
+            } catch (e) { /* skip */ }
 
-            // Max flight count for radius scaling
             const maxCount = Math.max(...data.destinations.map(d => d.flight_count), 1);
 
-            // Process destinations sequentially (Nominatim rate limit)
-            for (const dest of data.destinations) {
+            // Process destinations with skippable animation
+            for (let i = 0; i < data.destinations.length; i++) {
+                const dest = data.destinations[i];
+                const pct = Math.round(((i + 1) / total) * 100);
+                progressBar.style.width = `${pct}%`;
+                progressText.textContent = `Mapping ${dest.destination} (${i + 1}/${total})...`;
+
                 try {
-                    if (!geoCache.has(dest.destination)) {
-                        await new Promise(r => setTimeout(r, 200));
+                    if (!geoCache.has(dest.destination) && !skipAnimation) {
+                        await new Promise(r => setTimeout(r, 180));
                     }
                     const geo = await geocodeAirport(dest.destination);
+                    explorerDestGeoData[dest.destination] = geo;
                     const tier = getTier(dest.cheapest_price, maxBudget);
                     const color = getTierColor(tier);
                     const radius = 6 + (dest.flight_count / maxCount) * 6;
@@ -2120,26 +2226,37 @@
                     }).addTo(explorerMap).bindPopup(
                         `<strong>${escapeHtml(dest.destination)}</strong><br>${formatCurrency(dest.cheapest_price)}<br>${escapeHtml(dest.airline)} - ${dest.flight_count} flights`
                     );
+
+                    marker.on('click', () => zoomToDestination(dest.destination));
                     explorerMarkers.push(marker);
                     allBounds.push([geo.lat, geo.lon]);
 
-                    // Faint route line
+                    // Route line from origin
                     if (allBounds.length > 1) {
                         const pts = greatCirclePoints(allBounds[0][0], allBounds[0][1], geo.lat, geo.lon, 40);
-                        const line = L.polyline(pts, { weight: 1.5, opacity: 0.2, color }).addTo(explorerMap);
+                        const line = L.polyline(pts, { weight: 1.5, opacity: 0.15, color }).addTo(explorerMap);
                         explorerMarkers.push(line);
                     }
-                } catch (e) { /* skip destinations that fail geocoding */ }
+                } catch (e) { /* skip */ }
             }
+
+            progressEl.style.display = 'none';
 
             if (allBounds.length > 1) {
                 explorerMap.fitBounds(allBounds, { padding: [30, 30] });
             }
 
-            // Render destination cards
+            // Render destination cards with expanded detail
             const container = document.getElementById('explorer-destinations');
             container.innerHTML = data.destinations.map(dest => {
                 const tier = getTier(dest.cheapest_price, maxBudget);
+                const sf = dest.sample_flight || {};
+                const depTime = sf.departure_datetime ? formatDateTime(sf.departure_datetime) : '';
+                const arrTime = sf.arrival_datetime ? formatDateTime(sf.arrival_datetime) : '';
+                const duration = sf.duration || '';
+                const aircraft = sf.aircraft || '';
+                const flightNum = sf.flight_number || '';
+
                 return `
                     <div class="dest-card" data-dest="${escapeHtml(dest.destination)}">
                         <div>
@@ -2147,23 +2264,50 @@
                             <span class="dest-tier ${tier}">${escapeHtml(getTierLabel(tier))}</span>
                         </div>
                         <div class="dest-price">${formatCurrency(dest.cheapest_price)}</div>
-                        <div class="dest-meta">${escapeHtml(dest.airline)} - ${dest.flight_count} flight${dest.flight_count !== 1 ? 's' : ''}</div>
+                        <div class="dest-meta">${escapeHtml(dest.airline)} ${escapeHtml(flightNum)} - ${dest.flight_count} flight${dest.flight_count !== 1 ? 's' : ''}</div>
+                        <div class="dest-detail">
+                            ${depTime ? `<div class="dest-detail-row"><span>Departs</span><span>${escapeHtml(depTime)}</span></div>` : ''}
+                            ${arrTime ? `<div class="dest-detail-row"><span>Arrives</span><span>${escapeHtml(arrTime)}</span></div>` : ''}
+                            ${duration ? `<div class="dest-detail-row"><span>Duration</span><span>${escapeHtml(duration)}</span></div>` : ''}
+                            ${aircraft ? `<div class="dest-detail-row"><span>Aircraft</span><span>${escapeHtml(aircraft)}</span></div>` : ''}
+                            <button class="dest-search-btn" data-origin="${escapeHtml(data.origin)}" data-dest="${escapeHtml(dest.destination)}">Search this route</button>
+                        </div>
                     </div>
                 `;
             }).join('');
 
-            // Click handler: populate main search and close
+            // Card click: zoom to destination on map + expand detail
             container.querySelectorAll('.dest-card').forEach(card => {
-                card.addEventListener('click', () => {
-                    document.getElementById('origin').value = data.origin;
-                    document.getElementById('destination').value = card.dataset.dest;
+                card.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('dest-search-btn')) return;
+                    const dest = card.dataset.dest;
+                    const isActive = card.classList.contains('active');
+
+                    if (isActive) {
+                        card.classList.remove('active');
+                        document.getElementById('explorer-show-all-btn').style.display = 'none';
+                        showAllDestinations();
+                    } else {
+                        zoomToDestination(dest);
+                        document.getElementById('explorer-show-all-btn').style.display = 'inline-flex';
+                    }
+                });
+            });
+
+            // "Search this route" button: populate main search and close
+            container.querySelectorAll('.dest-search-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    document.getElementById('origin').value = btn.dataset.origin;
+                    document.getElementById('destination').value = btn.dataset.dest;
                     closeExplorer();
                 });
             });
 
             document.getElementById('explorer-results-title').textContent = `Destinations from ${data.origin}`;
-            document.getElementById('explorer-dest-count').textContent = `${data.destination_count} destinations`;
+            document.getElementById('explorer-dest-count').textContent = `${data.destination_count} destination${data.destination_count !== 1 ? 's' : ''}`;
             document.getElementById('explorer-results-wrap').style.display = 'block';
+            document.getElementById('explorer-show-all-btn').style.display = 'none';
         }
 
         // Initialize
