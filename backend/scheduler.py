@@ -218,7 +218,7 @@ def check_prices():
                                 print(f"EMAIL_ERROR for {user_email}: {email_error}")
 
                 # ── Always update stored price ─────────────────────────────────
-                update_price(doc.reference, latest_price)
+                update_price(doc.reference, latest_price, previous_price)
                 summary["updated_tracks"] += 1
 
             except Exception as track_error:

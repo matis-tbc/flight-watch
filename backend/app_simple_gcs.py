@@ -2,6 +2,7 @@
 """flightwatch api - gcs support, no pandas, python 3.13"""
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 import os
 import sys
@@ -38,13 +39,14 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-tracks_db = []
-track_id_counter = 1
+app.mount("/frontend", StaticFiles(directory="../frontend", html=True), name="frontend")
+
+from firestore_logic import get_tracked_flights, delete_tracked_flight
 
 def check_amadeus_configured() -> bool:
     """check amadeus api config"""
@@ -355,30 +357,37 @@ async def create_track(
 
 @app.get("/api/tracks")
 async def list_tracks():
-    """List all flight tracks"""
+    """List all flight tracks from Firestore"""
+    tracks = []
+    for doc in get_tracked_flights():
+        track_data = doc.to_dict()
+        track_data["id"] = doc.id
+        tracks.append(track_data)
     return {
-        "count": len(tracks_db),
-        "tracks": tracks_db
+        "count": len(tracks),
+        "tracks": tracks
     }
 
 @app.get("/api/tracks/{track_id}")
-async def get_track(track_id: int):
-    """Get a specific track by ID"""
-    for track in tracks_db:
-        if track["id"] == track_id:
-            return track
-    
-    raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
+async def get_track(track_id: str):
+    """Get a specific track by Firestore doc ID"""
+    from firestore_logic import db
+    doc = db.collection("tracked_flights").document(track_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
+    track_data = doc.to_dict()
+    track_data["id"] = doc.id
+    return track_data
 
 @app.delete("/api/tracks/{track_id}")
-async def delete_track(track_id: int):
-    """Delete a track (soft delete)"""
-    for i, track in enumerate(tracks_db):
-        if track["id"] == track_id:
-            tracks_db[i]["status"] = "deleted"
-            return {"message": f"Track {track_id} deleted"}
-    
-    raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
+async def delete_track(track_id: str):
+    """Delete a track from Firestore"""
+    from firestore_logic import db
+    doc = db.collection("tracked_flights").document(track_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
+    delete_tracked_flight(track_id)
+    return {"message": f"Track {track_id} deleted"}
 
 def format_flight_data(flight_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Format flight data from Amadeus API for response"""
