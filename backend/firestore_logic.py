@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 
 try:
@@ -93,7 +93,7 @@ def get_tracked_flights_by_email(user_email: str):
     )
 
 
-def update_price(doc_ref, new_price, current_price):
+def update_price(doc_ref, new_price, current_price=None):
     """
     Update price on a tracked flight doc after scheduler checks it.
 
@@ -101,10 +101,42 @@ def update_price(doc_ref, new_price, current_price):
         doc_ref:       Firestore DocumentReference
         new_price:     latest price from GCS
         current_price: existing latest_price already in memory from scheduler.py
-                       — passed in to avoid an extra Firestore read
+                       (optional -- if omitted, previous_price is not updated)
     """
-    doc_ref.update({
-        "previous_price": current_price,
+    update_data = {
         "latest_price": new_price,
         "last_checked": firestore.SERVER_TIMESTAMP,
+    }
+    if current_price is not None:
+        update_data["previous_price"] = current_price
+    doc_ref.update(update_data)
+
+
+def was_notified_recently(doc_id, within_hours=24):
+    """
+    Check if we already sent a notification for this tracked flight recently.
+    Prevents spamming the same user about the same route.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=within_hours)
+    docs = (
+        db.collection("notification_log")
+        .where("doc_id", "==", doc_id)
+        .where("sent_at", ">=", cutoff)
+        .limit(1)
+        .stream()
+    )
+    return any(True for _ in docs)
+
+
+def log_notification_sent(doc_id, user_email, route, old_price, new_price):
+    """
+    Record that a price-drop email was sent, so we can deduplicate.
+    """
+    db.collection("notification_log").add({
+        "doc_id": doc_id,
+        "user_email": user_email,
+        "route": route,
+        "old_price": old_price,
+        "new_price": new_price,
+        "sent_at": datetime.now(timezone.utc),
     })
