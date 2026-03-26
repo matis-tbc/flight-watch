@@ -68,10 +68,11 @@ def _safe_int(raw_value, default: int) -> int:
 
 
 def _is_authorized_scheduler_request() -> bool:
-    """Allow unauthenticated requests only when no scheduler token is configured."""
+    """Require a valid SCHEDULER_TOKEN header. Deny by default if no token is configured."""
     required_token = os.getenv("SCHEDULER_TOKEN", "").strip()
     if not required_token:
-        return True
+        print("WARNING: SCHEDULER_TOKEN not set -- all scheduler requests will be denied. Set it in .env")
+        return False
     provided_token = request.headers.get("X-Scheduler-Token", "").strip()
     return provided_token == required_token
 

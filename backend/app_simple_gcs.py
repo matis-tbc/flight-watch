@@ -389,6 +389,78 @@ async def delete_track(track_id: str):
     delete_tracked_flight(track_id)
     return {"message": f"Track {track_id} deleted"}
 
+@app.post("/api/predict")
+async def predict_price(payload: dict):
+    """
+    Purchase guidance heuristic. Returns a recommendation (BUY NOW / WAIT / WATCH CLOSELY)
+    based on current prices, spread, volatility, and days until departure.
+    Will be replaced with a trained model later.
+    """
+    best = float(payload.get("current_best_price") or 0)
+    avg = float(payload.get("current_avg_price") or best)
+    spread = float(payload.get("current_price_spread") or 0)
+    volatility = float(payload.get("volatility_score") or 0)
+    days = int(payload.get("days_until_departure") or 0)
+
+    if best <= 0:
+        return {
+            "recommendation": "NO DATA",
+            "confidence": 0,
+            "predicted_lowest_price": 0,
+            "expected_dip_window": "No pricing data available",
+            "estimated_savings": 0,
+            "rationale": "No valid prices were found for this route. Try a different date or route.",
+            "model_status": "python-heuristic-v1",
+            "price_floor": 0,
+            "price_ceiling": 0,
+            "current_best_price": 0,
+            "source_mode": "model",
+        }
+
+    recommendation = "WATCH CLOSELY"
+    confidence = 0.62
+    savings_pct = 0.05
+    rationale = "Prices are neither extremely compressed nor clearly falling yet, so monitoring for a better entry point is reasonable."
+
+    if days <= 10:
+        recommendation = "BUY NOW"
+        confidence = 0.84
+        savings_pct = 0.01
+        rationale = "Departure is close, so the downside of waiting is higher than the likely savings from a short-lived dip."
+    elif volatility >= 0.18 and days >= 14:
+        recommendation = "WAIT"
+        confidence = 0.76
+        savings_pct = 0.08
+        rationale = "This route shows a wide fare spread and enough time before departure, which increases the odds of another softer pricing window."
+    elif best <= avg * 0.92:
+        recommendation = "BUY NOW"
+        confidence = 0.72
+        savings_pct = 0.02
+        rationale = "The current best fare is already meaningfully below the route average, so it looks like a strong available deal."
+    elif days <= 21:
+        recommendation = "WATCH CLOSELY"
+        confidence = 0.69
+        savings_pct = 0.04
+        rationale = "There may still be modest movement, but the departure date is approaching quickly enough that waiting should be limited."
+
+    estimated_savings = max(0, round(min(spread * 0.45, avg * savings_pct)))
+    predicted_lowest = max(0, round(best - estimated_savings))
+
+    return {
+        "recommendation": recommendation,
+        "confidence": confidence,
+        "predicted_lowest_price": predicted_lowest or best,
+        "expected_dip_window": "Current fare is already attractive" if recommendation == "BUY NOW" else f"{days - 5} to {days} days out",
+        "estimated_savings": estimated_savings,
+        "rationale": rationale,
+        "model_status": "python-heuristic-v1",
+        "price_floor": best,
+        "price_ceiling": best + spread,
+        "current_best_price": best,
+        "source_mode": "model",
+    }
+
+
 def format_flight_data(flight_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Format flight data from Amadeus API for response"""
     if not flight_data:
