@@ -765,6 +765,223 @@
                 align-items: flex-start;
             }
         }
+        /* Budget Explorer Modal */
+        .explorer-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .explorer-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .explorer-modal {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 1100px;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 32px;
+            position: relative;
+            transform: translateY(20px);
+            opacity: 0;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        .explorer-overlay.active .explorer-modal {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .explorer-close-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 36px;
+            height: 36px;
+            border-radius: 999px;
+            border: 1px solid #dfe3eb;
+            background: #ffffff;
+            color: #667eea;
+            font-size: 20px;
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+            transition: background-color 0.18s ease;
+            z-index: 10;
+        }
+
+        .explorer-close-btn:hover {
+            background: #f7f8ff;
+        }
+
+        .explorer-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 6px;
+        }
+
+        .explorer-subtitle {
+            color: #666;
+            font-size: 0.95rem;
+            margin-bottom: 20px;
+        }
+
+        .explorer-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .budget-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .budget-value {
+            background: #f3f4f6;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: #333;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            border-radius: 999px;
+            background: #e5e7eb;
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        #explorer-map {
+            height: 400px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid #f0f0f0;
+            margin-bottom: 16px;
+        }
+
+        .explorer-results {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            max-height: 280px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .explorer-results::-webkit-scrollbar { width: 8px; }
+        .explorer-results::-webkit-scrollbar-track { background: #f3f4f6; border-radius: 999px; }
+        .explorer-results::-webkit-scrollbar-thumb { background: #c4c9d4; border-radius: 999px; }
+
+        .dest-card {
+            background: #f9f9f9;
+            border-radius: 12px;
+            padding: 14px;
+            border-left: 4px solid #667eea;
+            cursor: pointer;
+            transition: background 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .dest-card:hover {
+            background: #ffffff;
+            box-shadow: inset 0 0 0 1px #ececf3;
+        }
+
+        .dest-code {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .dest-price {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #667eea;
+            margin-top: 2px;
+        }
+
+        .dest-meta {
+            color: #888;
+            font-size: 0.82rem;
+            margin-top: 4px;
+        }
+
+        .dest-tier {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
+        .dest-tier.cheap { background: #e8f5e9; color: #2e7d32; }
+        .dest-tier.mid { background: #fff3e0; color: #ef6c00; }
+        .dest-tier.expensive { background: #ffebee; color: #c62828; }
+
+        .explorer-results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .explorer-results-header h3 {
+            font-size: 1.05rem;
+            color: #333;
+        }
+
+        #explorer-suggestions {
+            z-index: 1100;
+        }
+
+        @media (max-width: 768px) {
+            .explorer-form {
+                grid-template-columns: 1fr;
+            }
+            .explorer-modal {
+                padding: 20px;
+            }
+            #explorer-map {
+                height: 280px;
+            }
+            .explorer-results {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -805,6 +1022,7 @@
             </div>
 
             <button class="search-btn" id="search-button">Search Flights</button>
+            <button class="search-btn secondary" id="budget-explorer-btn" type="button">Explore Destinations by Budget</button>
         </div>
 
         <div class="map-wrap">
@@ -895,6 +1113,53 @@
                 </div>
             </div>
             <div id="flights-container"></div>
+        </div>
+    </div>
+
+    <!-- Budget Explorer Modal -->
+    <div class="explorer-overlay" id="explorer-overlay">
+        <div class="explorer-modal">
+            <button class="explorer-close-btn" id="explorer-close-btn">&times;</button>
+            <div class="explorer-title">Budget Explorer</div>
+            <p class="explorer-subtitle">Find every destination you can reach within your budget</p>
+
+            <div class="explorer-form">
+                <div class="form-group">
+                    <label for="explorer-origin">From</label>
+                    <input type="text" id="explorer-origin" placeholder="e.g., JFK" autocomplete="off">
+                    <div class="suggestions" id="explorer-suggestions"></div>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <div class="budget-display">
+                            <span>Maximum Budget</span>
+                            <span class="budget-value" id="budget-value">$500</span>
+                        </div>
+                    </label>
+                    <input type="range" id="budget-slider" min="50" max="2000" step="25" value="500">
+                </div>
+                <div class="form-group">
+                    <label for="explorer-date">Departure Date (optional)</label>
+                    <input type="date" id="explorer-date">
+                </div>
+            </div>
+
+            <button class="search-btn" id="explore-btn">Find Destinations</button>
+
+            <div class="loading" id="explorer-loading">Searching destinations...</div>
+            <div class="status" id="explorer-status"></div>
+
+            <div id="explorer-map-wrap" style="margin-top: 16px;">
+                <div id="explorer-map"></div>
+            </div>
+
+            <div id="explorer-results-wrap" style="display: none; margin-top: 16px;">
+                <div class="explorer-results-header">
+                    <h3 id="explorer-results-title">Destinations</h3>
+                    <span class="summary-chip" id="explorer-dest-count">0 destinations</span>
+                </div>
+                <div class="explorer-results" id="explorer-destinations"></div>
+            </div>
         </div>
     </div>
 
@@ -1688,6 +1953,217 @@
                 hour: '2-digit',
                 minute: '2-digit'
             });
+        }
+
+        // ── Budget Explorer ──────────────────────────────────────────────
+        let explorerMap = null;
+        let explorerMarkers = [];
+        let isExploring = false;
+
+        function openExplorer() {
+            const overlay = document.getElementById('explorer-overlay');
+            overlay.style.display = 'flex';
+            requestAnimationFrame(() => overlay.classList.add('active'));
+
+            if (!explorerMap) {
+                explorerMap = L.map('explorer-map').setView([39.5, -98.35], 3);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 18,
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(explorerMap);
+            }
+            setTimeout(() => explorerMap.invalidateSize(), 150);
+
+            const mainOrigin = document.getElementById('origin').value.trim();
+            if (mainOrigin) {
+                document.getElementById('explorer-origin').value = mainOrigin;
+            }
+        }
+
+        function closeExplorer() {
+            const overlay = document.getElementById('explorer-overlay');
+            overlay.classList.remove('active');
+            setTimeout(() => { overlay.style.display = 'none'; }, 300);
+        }
+
+        function clearExplorerMarkers() {
+            explorerMarkers.forEach(m => explorerMap.removeLayer(m));
+            explorerMarkers = [];
+        }
+
+        function getTier(price, maxBudget) {
+            if (price <= maxBudget * 0.33) return 'cheap';
+            if (price <= maxBudget * 0.66) return 'mid';
+            return 'expensive';
+        }
+
+        function getTierColor(tier) {
+            if (tier === 'cheap') return '#2e7d32';
+            if (tier === 'mid') return '#ef6c00';
+            return '#c62828';
+        }
+
+        function getTierLabel(tier) {
+            if (tier === 'cheap') return 'Great deal';
+            if (tier === 'mid') return 'Fair price';
+            return 'Near budget';
+        }
+
+        document.getElementById('budget-slider').addEventListener('input', (e) => {
+            document.getElementById('budget-value').textContent = `$${e.target.value}`;
+        });
+
+        document.getElementById('budget-explorer-btn').addEventListener('click', openExplorer);
+        document.getElementById('explorer-close-btn').addEventListener('click', closeExplorer);
+
+        document.getElementById('explorer-overlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeExplorer();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.getElementById('explorer-overlay').classList.contains('active')) {
+                closeExplorer();
+            }
+        });
+
+        document.getElementById('explorer-origin').addEventListener('input', (e) => {
+            showSuggestions('explorer-origin', 'explorer-suggestions', e.target.value);
+        });
+
+        document.getElementById('explore-btn').addEventListener('click', async () => {
+            if (isExploring) return;
+
+            const origin = document.getElementById('explorer-origin').value.trim().toUpperCase();
+            const maxPrice = document.getElementById('budget-slider').value;
+            const date = document.getElementById('explorer-date').value;
+
+            if (!origin) {
+                document.getElementById('explorer-status').textContent = 'Enter an origin airport';
+                document.getElementById('explorer-status').className = 'status error';
+                document.getElementById('explorer-status').style.display = 'block';
+                return;
+            }
+
+            isExploring = true;
+            const btn = document.getElementById('explore-btn');
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            document.getElementById('explorer-loading').style.display = 'block';
+            document.getElementById('explorer-status').style.display = 'none';
+
+            try {
+                const params = new URLSearchParams({ origin, max_price: maxPrice });
+                if (date) params.append('departure_date', date);
+
+                const response = await fetch(`${API_BASE}/explore?${params}`);
+                if (!response.ok) {
+                    const err = await response.json().catch(() => null);
+                    throw new Error(err?.detail || `Server error (${response.status})`);
+                }
+
+                const data = await response.json();
+                document.getElementById('explorer-loading').style.display = 'none';
+
+                if (data.destinations && data.destinations.length > 0) {
+                    document.getElementById('explorer-status').style.display = 'none';
+                    await renderExplorerResults(data);
+                } else {
+                    document.getElementById('explorer-status').textContent = 'No destinations found within that budget. Try increasing it.';
+                    document.getElementById('explorer-status').className = 'status error';
+                    document.getElementById('explorer-status').style.display = 'block';
+                    document.getElementById('explorer-results-wrap').style.display = 'none';
+                    clearExplorerMarkers();
+                }
+            } catch (error) {
+                document.getElementById('explorer-loading').style.display = 'none';
+                document.getElementById('explorer-status').textContent = `Error: ${error.message}`;
+                document.getElementById('explorer-status').className = 'status error';
+                document.getElementById('explorer-status').style.display = 'block';
+            } finally {
+                isExploring = false;
+                btn.disabled = false;
+                btn.style.opacity = '';
+            }
+        });
+
+        async function renderExplorerResults(data) {
+            clearExplorerMarkers();
+            const maxBudget = data.max_price;
+            const allBounds = [];
+
+            // Origin marker
+            try {
+                const orig = await geocodeAirport(data.origin);
+                const originMarker = L.circleMarker([orig.lat, orig.lon], {
+                    radius: 10, fillColor: '#667eea', fillOpacity: 1, color: '#fff', weight: 2
+                }).addTo(explorerMap).bindPopup(escapeHtml(data.origin));
+                explorerMarkers.push(originMarker);
+                allBounds.push([orig.lat, orig.lon]);
+            } catch (e) { /* skip if geocode fails */ }
+
+            // Max flight count for radius scaling
+            const maxCount = Math.max(...data.destinations.map(d => d.flight_count), 1);
+
+            // Process destinations sequentially (Nominatim rate limit)
+            for (const dest of data.destinations) {
+                try {
+                    if (!geoCache.has(dest.destination)) {
+                        await new Promise(r => setTimeout(r, 200));
+                    }
+                    const geo = await geocodeAirport(dest.destination);
+                    const tier = getTier(dest.cheapest_price, maxBudget);
+                    const color = getTierColor(tier);
+                    const radius = 6 + (dest.flight_count / maxCount) * 6;
+
+                    const marker = L.circleMarker([geo.lat, geo.lon], {
+                        radius, fillColor: color, fillOpacity: 0.85, color: '#fff', weight: 1.5
+                    }).addTo(explorerMap).bindPopup(
+                        `<strong>${escapeHtml(dest.destination)}</strong><br>${formatCurrency(dest.cheapest_price)}<br>${escapeHtml(dest.airline)} - ${dest.flight_count} flights`
+                    );
+                    explorerMarkers.push(marker);
+                    allBounds.push([geo.lat, geo.lon]);
+
+                    // Faint route line
+                    if (allBounds.length > 1) {
+                        const pts = greatCirclePoints(allBounds[0][0], allBounds[0][1], geo.lat, geo.lon, 40);
+                        const line = L.polyline(pts, { weight: 1.5, opacity: 0.2, color }).addTo(explorerMap);
+                        explorerMarkers.push(line);
+                    }
+                } catch (e) { /* skip destinations that fail geocoding */ }
+            }
+
+            if (allBounds.length > 1) {
+                explorerMap.fitBounds(allBounds, { padding: [30, 30] });
+            }
+
+            // Render destination cards
+            const container = document.getElementById('explorer-destinations');
+            container.innerHTML = data.destinations.map(dest => {
+                const tier = getTier(dest.cheapest_price, maxBudget);
+                return `
+                    <div class="dest-card" data-dest="${escapeHtml(dest.destination)}">
+                        <div>
+                            <span class="dest-code">${escapeHtml(dest.destination)}</span>
+                            <span class="dest-tier ${tier}">${escapeHtml(getTierLabel(tier))}</span>
+                        </div>
+                        <div class="dest-price">${formatCurrency(dest.cheapest_price)}</div>
+                        <div class="dest-meta">${escapeHtml(dest.airline)} - ${dest.flight_count} flight${dest.flight_count !== 1 ? 's' : ''}</div>
+                    </div>
+                `;
+            }).join('');
+
+            // Click handler: populate main search and close
+            container.querySelectorAll('.dest-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    document.getElementById('origin').value = data.origin;
+                    document.getElementById('destination').value = card.dataset.dest;
+                    closeExplorer();
+                });
+            });
+
+            document.getElementById('explorer-results-title').textContent = `Destinations from ${data.origin}`;
+            document.getElementById('explorer-dest-count').textContent = `${data.destination_count} destinations`;
+            document.getElementById('explorer-results-wrap').style.display = 'block';
         }
 
         // Initialize

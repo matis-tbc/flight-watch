@@ -90,6 +90,31 @@ def test_predict_no_data(client):
     assert data["recommendation"] == "NO DATA"
 
 
+def test_explore_returns_destinations(client):
+    response = client.get("/api/explore", params={"origin": "JFK", "max_price": 500})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["origin"] == "JFK"
+    assert data["max_price"] == 500
+    assert "destinations" in data
+    assert data["destination_count"] == len(data["destinations"])
+    if data["destinations"]:
+        dest = data["destinations"][0]
+        assert "destination" in dest
+        assert "cheapest_price" in dest
+        assert dest["cheapest_price"] <= 500
+
+
+def test_explore_missing_origin(client):
+    response = client.get("/api/explore", params={"max_price": 500})
+    assert response.status_code == 422
+
+
+def test_explore_zero_budget(client):
+    response = client.get("/api/explore", params={"origin": "JFK", "max_price": 0})
+    assert response.status_code == 422
+
+
 def test_gcs_info(client):
     response = client.get("/api/gcs-info")
     assert response.status_code == 200

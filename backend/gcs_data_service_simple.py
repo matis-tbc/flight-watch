@@ -98,6 +98,77 @@ class GCSDataServiceSimple:
         
         return filtered[:limit]
     
+    def _extract_price(self, record: Dict[str, Any]):
+        """Extract numeric price from a flight record, handling multiple field formats."""
+        for field in ('total_price', 'price', 'flight_price'):
+            raw = record.get(field)
+            if raw is None:
+                continue
+            if isinstance(raw, dict):
+                raw = raw.get('total')
+            try:
+                return float(str(raw).replace(',', '').strip())
+            except (TypeError, ValueError):
+                continue
+        return None
+
+    def explore_destinations(
+        self,
+        origin: str,
+        max_price: float,
+        departure_date: str = None,
+    ) -> List[Dict[str, Any]]:
+        """Find all reachable destinations from an origin within a budget.
+        Returns cheapest flight per destination, sorted by price."""
+        if self.data_cache is None:
+            flight_data = self.load_data_from_gcs()
+            if flight_data is None:
+                return []
+        else:
+            flight_data = self.data_cache
+
+        if not flight_data:
+            return []
+
+        origin = origin.upper()
+        filtered = [f for f in flight_data
+                     if self._get_field(f, 'origin', 'origin_location', 'origin_code').upper() == origin]
+
+        if departure_date:
+            filtered = [f for f in filtered
+                         if self._get_field(f, 'departure_datetime', 'departure_date', 'date', 'departure').startswith(departure_date)]
+
+        # Group by destination, keep cheapest
+        dest_map = {}
+        for flight in filtered:
+            price = self._extract_price(flight)
+            if price is None or price > max_price:
+                continue
+            dest = self._get_field(flight, 'destination', 'dest_location', 'dest_code').upper()
+            if not dest:
+                continue
+            if dest not in dest_map:
+                dest_map[dest] = {'cheapest': price, 'flight': flight, 'count': 0}
+            dest_map[dest]['count'] += 1
+            if price < dest_map[dest]['cheapest']:
+                dest_map[dest]['cheapest'] = price
+                dest_map[dest]['flight'] = flight
+
+        results = []
+        for dest, info in dest_map.items():
+            f = info['flight']
+            results.append({
+                'destination': dest,
+                'cheapest_price': info['cheapest'],
+                'currency': self._get_field(f, 'currency') or 'USD',
+                'airline': self._get_field(f, 'airline_code', 'airline') or 'Unknown',
+                'flight_count': info['count'],
+                'sample_flight': f,
+            })
+
+        results.sort(key=lambda x: x['cheapest_price'])
+        return results
+
     def _get_field(self, record: Dict[str, Any], *field_names: str) -> str:
         """get field with fallback names"""
         for field in field_names:
