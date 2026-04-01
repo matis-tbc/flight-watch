@@ -1,0 +1,8 @@
+amadeus==7.0.0
+boto3
+google-cloud-bigquery
+google-cloud-storage
+db-types
+pandas
+python-dotenv
+requests
