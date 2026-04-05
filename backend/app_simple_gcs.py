@@ -298,6 +298,45 @@ async def search_flights(
         "note": "⚠️ Configure GCS or Amadeus for real flight data"
     }
 
+@app.get("/api/explore")
+async def explore_destinations(
+    origin: str,
+    max_price: float = Query(..., gt=0),
+    departure_date: Optional[str] = Query(None),
+):
+    """Budget Explorer: find all destinations reachable from an origin within a price."""
+    origin = origin.strip().upper()
+
+    if GCS_AVAILABLE and gcs_data_service_simple.is_configured():
+        destinations = gcs_data_service_simple.explore_destinations(
+            origin=origin,
+            max_price=max_price,
+            departure_date=departure_date,
+        )
+        return {
+            "origin": origin,
+            "max_price": max_price,
+            "departure_date": departure_date,
+            "destination_count": len(destinations),
+            "destinations": destinations,
+            "source": "gcs",
+        }
+
+    # Mock fallback
+    return {
+        "origin": origin,
+        "max_price": max_price,
+        "departure_date": departure_date,
+        "destination_count": 3,
+        "destinations": [
+            {"destination": "LAX", "cheapest_price": 132.99, "currency": "USD", "airline": "B6", "flight_count": 8, "sample_flight": {}},
+            {"destination": "MIA", "cheapest_price": 189.50, "currency": "USD", "airline": "AA", "flight_count": 5, "sample_flight": {}},
+            {"destination": "ORD", "cheapest_price": 95.00, "currency": "USD", "airline": "UA", "flight_count": 12, "sample_flight": {}},
+        ],
+        "source": "mock",
+    }
+
+
 @app.post("/api/tracks")
 async def create_track(
     origin: str,
