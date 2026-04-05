@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(pip search:*)",
+      "Bash(python3 -m py_compile flight_fetcher.py)",
+      "Bash(python3:*)",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(echo:*)",
+      "Bash(source .venv/bin/activate)",
+      "Bash(chmod:*)",
+      "Bash(kill:*)",
+      "Bash(ls -la /Users/maxwhite/Downloads/flight_test/*.md)",
+      "Bash(ls -la /Users/maxwhite/Downloads/flight_test/*.py)",
+      "Bash(ls -la /Users/maxwhite/Downloads/flight_test/*.py /Users/maxwhite/Downloads/flight_test/*.log)",
+      "Bash(.venv/bin/python3 -c \"from config import get_top_routes, FARE_MIN, FARE_MAX, MIN_BASELINE_SAMPLES; print\\(f'FARE_MIN={FARE_MIN}, FARE_MAX={FARE_MAX}, MIN_BASELINE_SAMPLES={MIN_BASELINE_SAMPLES}'\\); routes = get_top_routes\\(5\\); print\\(f'Got {len\\(routes\\)} routes'\\)\")",
+      "Bash(.venv/bin/python3 -c \"from bts_client import build_route_baselines; print\\('bts_client.py imports successfully'\\)\")",
+      "Bash(.venv/bin/python3 -c \"from pipeline import main; print\\('pipeline.py imports successfully'\\)\")",
+      "Bash(.venv/bin/python3 pipeline.py --dry-run 2>&1)",
+      "Bash(.venv/bin/python3 -c \"\nfrom config import get_top_routes\nroutes = get_top_routes\\(3\\)\nprint\\('Route keys:', routes[0].keys\\(\\)\\)\nprint\\('Sample route:', routes[0]\\)\n\")",
+      "Bash(.venv/bin/python3 -c \"\nfrom amadeus_client import fetch_fares\nresult = fetch_fares\\('JFK', 'LAX', '2026-04-01'\\)\nprint\\('Result type:', type\\(result\\)\\)\nprint\\('Has data:', 'data' in result if result else 'No result'\\)\nif result and 'data' in result:\n    print\\('Number of offers:', len\\(result['data']\\)\\)\n\")",
+      "Bash(.venv/bin/python3 pipeline.py 2>&1)"
+    ]
+  }
+}
