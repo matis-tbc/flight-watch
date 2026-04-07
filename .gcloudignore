@@ -1,0 +1,24 @@
+.git
+.gitignore
+.gcloudignore
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.DS_Store
+**/.env
+**/*.env
+backend/venv/
+venv/
+env/
+.venv/
+node_modules/
+frontend/node_modules/
+dist/
+build/
+htmlcov/
+.coverage
+backend/service-account-key.json
+backend/service-account-key copy.json
+backend/service-account-key*.json
+*-key.json
+*.json.key

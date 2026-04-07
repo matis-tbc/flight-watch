@@ -1,4 +1,6 @@
 """Tests for FlightWatch API endpoints."""
+import firestore_logic
+from date_utils import normalize_date_text
 
 
 def test_health(client):
@@ -120,3 +122,20 @@ def test_gcs_info(client):
     assert response.status_code == 200
     data = response.json()
     assert "status" in data
+
+
+def test_tracks_returns_503_when_firestore_is_unavailable(client, monkeypatch):
+    def raise_firestore_error():
+        raise firestore_logic.FirestoreConfigurationError("Firestore unavailable for test")
+
+    monkeypatch.setattr(firestore_logic, "get_db", raise_firestore_error)
+
+    response = client.get("/api/tracks")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Firestore unavailable for test"
+
+
+def test_normalize_date_text_accepts_slash_format():
+    assert normalize_date_text("04/08/2026") == "2026-04-08"
+    assert normalize_date_text("2026-04-08T09:00:00") == "2026-04-08"

@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
+from google.auth.exceptions import DefaultCredentialsError
 
 try:
     from google.cloud import firestore
@@ -13,24 +14,50 @@ except ImportError:
             "and install requirements: pip install -r backend/requirements.txt"
         ) from fallback_error
 
+from gcp_auth import resolve_google_application_credentials, google_credentials_help
+
 BASE_DIR = os.path.dirname(__file__)
 load_dotenv(os.path.join(BASE_DIR, ".env"))
+resolve_google_application_credentials()
 
-credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-if credentials_path:
-    normalized_credentials_path = credentials_path.strip()
-    if not os.path.isabs(normalized_credentials_path):
-        normalized_credentials_path = os.path.join(BASE_DIR, normalized_credentials_path)
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath(normalized_credentials_path)
 
-db = firestore.Client()
+class FirestoreConfigurationError(RuntimeError):
+    """Raised when Firestore cannot be initialized in the current environment."""
+
+
+_db = None
+
+
+def get_db():
+    global _db
+    if _db is not None:
+        return _db
+
+    resolve_google_application_credentials()
+
+    try:
+        _db = firestore.Client()
+    except DefaultCredentialsError as error:
+        raise FirestoreConfigurationError(
+            google_credentials_help("Firestore")
+        ) from error
+
+    return _db
+
+
+class _LazyFirestoreClient:
+    def __getattr__(self, attr_name):
+        return getattr(get_db(), attr_name)
+
+
+db = _LazyFirestoreClient()
 
 
 def get_tracked_flights():
     """Stream all docs from tracked_flights collection.
     Called by scheduler.py /check-prices to find which users to email.
     """
-    return db.collection("tracked_flights").stream()
+    return get_db().collection("tracked_flights").stream()
 
 
 def create_tracked_flight(
@@ -69,7 +96,7 @@ def create_tracked_flight(
         "created_at": firestore.SERVER_TIMESTAMP,
     }
     # Auto-generate doc ID
-    _, doc_ref = db.collection("tracked_flights").add(doc_data)
+    _, doc_ref = get_db().collection("tracked_flights").add(doc_data)
     return doc_ref.id
 
 
@@ -78,7 +105,7 @@ def delete_tracked_flight(doc_id: str):
     Remove a tracked flight from Firestore.
     Called by app_simple_gcs.py DELETE /api/tracks/{id}
     """
-    db.collection("tracked_flights").document(doc_id).delete()
+    get_db().collection("tracked_flights").document(doc_id).delete()
 
 
 def get_tracked_flights_by_email(user_email: str):
@@ -87,7 +114,7 @@ def get_tracked_flights_by_email(user_email: str):
     Useful for showing a user their own tracked flights in the frontend.
     """
     return (
-        db.collection("tracked_flights")
+        get_db().collection("tracked_flights")
         .where("user_email", "==", user_email)
         .stream()
     )
@@ -119,7 +146,7 @@ def was_notified_recently(doc_id, within_hours=24):
     """
     cutoff = datetime.now(timezone.utc) - timedelta(hours=within_hours)
     docs = (
-        db.collection("notification_log")
+        get_db().collection("notification_log")
         .where("doc_id", "==", doc_id)
         .where("sent_at", ">=", cutoff)
         .limit(1)
@@ -132,7 +159,7 @@ def log_notification_sent(doc_id, user_email, route, old_price, new_price):
     """
     Record that a price-drop email was sent, so we can deduplicate.
     """
-    db.collection("notification_log").add({
+    get_db().collection("notification_log").add({
         "doc_id": doc_id,
         "user_email": user_email,
         "route": route,

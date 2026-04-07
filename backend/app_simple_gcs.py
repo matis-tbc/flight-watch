@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """flightwatch api - gcs support, no pandas, python 3.13"""
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
@@ -12,14 +13,30 @@ from datetime import datetime
 BASE_DIR = os.path.dirname(__file__)
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
-credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-if credentials_path:
-    normalized_credentials_path = credentials_path.strip()
-    if not os.path.isabs(normalized_credentials_path):
-        normalized_credentials_path = os.path.join(BASE_DIR, normalized_credentials_path)
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath(normalized_credentials_path)
+from gcp_auth import resolve_google_application_credentials
+from date_utils import normalize_date_text
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'scripts', 'flight_fetch'))
+resolve_google_application_credentials()
+
+
+def _first_existing_path(*candidates: str) -> str:
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+    return candidates[0]
+
+
+FLIGHT_FETCH_DIR = _first_existing_path(
+    os.path.abspath(os.path.join(BASE_DIR, "..", "scripts", "flight_fetch")),
+    os.path.abspath(os.path.join(BASE_DIR, "scripts", "flight_fetch")),
+)
+if FLIGHT_FETCH_DIR not in sys.path:
+    sys.path.append(FLIGHT_FETCH_DIR)
+
+FRONTEND_DIR = _first_existing_path(
+    os.path.abspath(os.path.join(BASE_DIR, "..", "frontend")),
+    os.path.abspath(os.path.join(BASE_DIR, "frontend")),
+)
 
 try:
     from gcs_data_service_simple import gcs_data_service_simple
@@ -44,9 +61,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/frontend", StaticFiles(directory="../frontend", html=True), name="frontend")
+app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
 
-from firestore_logic import get_tracked_flights, delete_tracked_flight
+from firestore_logic import (
+    FirestoreConfigurationError,
+    delete_tracked_flight,
+    get_tracked_flights,
+)
+
+
+@app.exception_handler(FirestoreConfigurationError)
+async def firestore_configuration_error_handler(_, exc: FirestoreConfigurationError):
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return Response(status_code=204)
 
 def check_amadeus_configured() -> bool:
     """check amadeus api config"""
@@ -222,7 +253,8 @@ async def search_flights(
     limit: int = 50
 ):
     """search flights - gcs first, then amadeus, then mock"""
-    actual_departure_date = departure_date
+    actual_departure_date = normalize_date_text(departure_date)
+    normalized_return_date = normalize_date_text(return_date)
     if not actual_departure_date:
         from datetime import datetime
         actual_departure_date = datetime.now().strftime("%Y-%m-%d")
@@ -241,7 +273,7 @@ async def search_flights(
                     "origin": origin,
                     "destination": destination,
                     "departure_date": actual_departure_date,
-                    "return_date": return_date,
+                    "return_date": normalized_return_date,
                     "passengers": passengers,
                     "flights": flights[:limit],
                     "source": "gcs",
@@ -263,7 +295,7 @@ async def search_flights(
                 origin,
                 destination,
                 actual_departure_date,
-                return_date,
+                normalized_return_date,
                 passengers
             )
             
@@ -273,7 +305,7 @@ async def search_flights(
                 "origin": origin,
                 "destination": destination,
                 "departure_date": actual_departure_date,
-                "return_date": return_date,
+                "return_date": normalized_return_date,
                 "passengers": passengers,
                 "flights": format_flight_data(flight_data)[:limit],
                 "source": "amadeus",
@@ -290,7 +322,7 @@ async def search_flights(
         "origin": origin,
         "destination": destination,
         "departure_date": actual_departure_date,
-        "return_date": return_date,
+        "return_date": normalized_return_date,
         "passengers": passengers,
         "flights": get_mock_flights(origin, destination, actual_departure_date)[:limit],
         "source": "mock",
@@ -306,17 +338,18 @@ async def explore_destinations(
 ):
     """Budget Explorer: find all destinations reachable from an origin within a price."""
     origin = origin.strip().upper()
+    normalized_departure_date = normalize_date_text(departure_date)
 
     if GCS_AVAILABLE and gcs_data_service_simple.is_configured():
         destinations = gcs_data_service_simple.explore_destinations(
             origin=origin,
             max_price=max_price,
-            departure_date=departure_date,
+            departure_date=normalized_departure_date,
         )
         return {
             "origin": origin,
             "max_price": max_price,
-            "departure_date": departure_date,
+            "departure_date": normalized_departure_date,
             "destination_count": len(destinations),
             "destinations": destinations,
             "source": "gcs",
@@ -326,7 +359,7 @@ async def explore_destinations(
     return {
         "origin": origin,
         "max_price": max_price,
-        "departure_date": departure_date,
+        "departure_date": normalized_departure_date,
         "destination_count": 3,
         "destinations": [
             {"destination": "LAX", "cheapest_price": 132.99, "currency": "USD", "airline": "B6", "flight_count": 8, "sample_flight": {}},
@@ -356,11 +389,16 @@ async def create_track(
     if not user_email:
         raise HTTPException(status_code=400, detail="user_email is required to receive price drop alerts.")
 
+    normalized_departure_date = normalize_date_text(departure_date)
+    normalized_return_date = normalize_date_text(return_date)
+    if not normalized_departure_date:
+        raise HTTPException(status_code=400, detail="departure_date is required.")
+
     # Fetch current price from GCS to use as the baseline for future comparisons
     flights = gcs_data_service_simple.search_flights(
         origin=origin,
         destination=destination,
-        departure_date=departure_date,
+        departure_date=normalized_departure_date,
         limit=1,
     )
 
@@ -378,9 +416,9 @@ async def create_track(
         user_email=user_email,
         origin=origin,
         destination=destination,
-        departure_date=departure_date,
+        departure_date=normalized_departure_date,
         latest_price=latest_price,
-        return_date=return_date,
+        return_date=normalized_return_date,
     )
 
     return {
@@ -389,8 +427,8 @@ async def create_track(
         "user_email": user_email,
         "origin": origin.upper(),
         "destination": destination.upper(),
-        "departure_date": departure_date,
-        "return_date": return_date,
+        "departure_date": normalized_departure_date,
+        "return_date": normalized_return_date,
         "baseline_price": latest_price,
     }
 

@@ -1,6 +1,3 @@
-# Build with the repo root as context:
-#   docker build -f backend/dockerfile -t flightwatch .
-
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

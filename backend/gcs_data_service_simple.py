@@ -7,6 +7,8 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from io import StringIO
 
+from gcp_auth import resolve_google_application_credentials
+
 logger = logging.getLogger(__name__)
 
 class GCSDataServiceSimple:
@@ -31,6 +33,8 @@ class GCSDataServiceSimple:
         
         try:
             from google.cloud import storage
+
+            resolve_google_application_credentials()
             
             logger.info(f"loading flight data from gcs: gs://{self.bucket_name}/{self.file_path}")
             

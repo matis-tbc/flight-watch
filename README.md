@@ -67,6 +67,9 @@ Next steps
 - Validate flight API limits and costs
 - Decide drop detection logic
 
+Deployment
+- Cloud Run deployment guide: [infra/README.md](/Users/sharonbayela/Documents/GitHub/flight-watch/infra/README.md)
+
 Open questions
 - Drop logic: absolute, percent, or window low?
 - Scheduler cadence: 6h vs 12h vs adaptive

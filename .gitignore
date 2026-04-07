@@ -18,6 +18,8 @@ env/
 .env
 *.env
 service-account-key.json
+backend/service-account-key*.json
+backend/service-account-key copy.json
 *-key.json
 *.json.key
 

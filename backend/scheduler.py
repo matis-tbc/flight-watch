@@ -30,13 +30,10 @@ from dotenv import load_dotenv
 BASE_DIR = os.path.dirname(__file__)
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
-# ── Credentials ───────────────────────────────────────────────────────────────
-credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-if credentials_path:
-    normalized_credentials_path = credentials_path.strip()
-    if not os.path.isabs(normalized_credentials_path):
-        normalized_credentials_path = os.path.join(BASE_DIR, normalized_credentials_path)
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath(normalized_credentials_path)
+from date_utils import normalize_date_text
+from gcp_auth import resolve_google_application_credentials
+
+resolve_google_application_credentials()
 
 # ── Local imports (all in backend/) ──────────────────────────────────────────
 from gcs_data_service_simple import gcs_data_service_simple
@@ -78,12 +75,7 @@ def _is_authorized_scheduler_request() -> bool:
 
 
 def _normalize_departure_date(raw_value) -> str | None:
-    if raw_value is None:
-        return None
-    if hasattr(raw_value, "date"):
-        return raw_value.date().isoformat()
-    date_text = str(raw_value).strip()
-    return date_text.split("T", 1)[0] if date_text else None
+    return normalize_date_text(raw_value)
 
 
 def _to_document_id(raw_value: str) -> str:
