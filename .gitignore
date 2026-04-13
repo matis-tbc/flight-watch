@@ -58,3 +58,5 @@ htmlcov/
 
 # Other
 *sandbox*
+.gstack/
+scripts/flight_data_batch.csv
