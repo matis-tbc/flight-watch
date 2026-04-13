@@ -187,10 +187,15 @@ class GCSDataServiceSimple:
 
     def _get_field(self, record: Dict[str, Any], *field_names: str) -> str:
         """get field with fallback names"""
+        normalized = {
+            str(k).strip().lower().replace('\ufeff', ''): v
+            for k, v in record.items()
+        }
         for field in field_names:
-            if field in record:
-                value = record[field]
-                return str(value) if value is not None else ""
+            key = field.strip().lower()
+            if key in normalized:
+                value = normalized[key]
+                return str(value).strip() if value is not None else ""
         return ""
     
     def get_available_origins(self) -> List[str]:

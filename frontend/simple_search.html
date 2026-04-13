@@ -1560,7 +1560,7 @@
             const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`;
 
             const res = await fetch(url, {
-                headers: { 'User-Agent': 'FlightWatch/1.0 (student project)' }
+                headers: { 'User-Agent': 'FlightWatch/1.0' }
             });
             if (!res.ok) throw new Error(`Geocode failed for ${code}`);
             const data = await res.json();

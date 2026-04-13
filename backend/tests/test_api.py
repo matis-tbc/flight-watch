@@ -164,11 +164,18 @@ def test_search_date_fallback(client):
 
 
 def test_search_exact_date(client):
-    """Search for a date within GCS range returns exact matches."""
+    """Search for a date within GCS range returns exact matches with no date_note."""
+    # Use a date within the current GCS data range
+    response = client.get("/api/data-range")
+    dr = response.json()
+    if not dr.get("earliest_date"):
+        return  # No GCS data loaded, skip
+    test_date = dr["earliest_date"]
+
     response = client.get("/api/search", params={
         "origin": "JFK",
-        "destination": "ORD",
-        "departure_date": "2026-03-15",
+        "destination": "LAX",
+        "departure_date": test_date,
     })
     assert response.status_code == 200
     data = response.json()
@@ -178,16 +185,21 @@ def test_search_exact_date(client):
 
 
 def test_create_track(client, monkeypatch):
-    monkeypatch.setattr(firestore_logic, "get_db", lambda: None)
-    import app_simple_gcs
+    # Mock create_tracked_flight at the module level where it's imported
     monkeypatch.setattr(
-        "firestore_logic.create_tracked_flight",
+        firestore_logic,
+        "create_tracked_flight",
         lambda **kwargs: "fake-doc-id",
     )
+    # Also patch it in app_simple_gcs since it may be imported there directly
+    import app_simple_gcs
+    if hasattr(app_simple_gcs, "create_tracked_flight"):
+        monkeypatch.setattr(app_simple_gcs, "create_tracked_flight", lambda **kwargs: "fake-doc-id")
+
     response = client.post("/api/tracks", params={
         "origin": "JFK",
         "destination": "ORD",
-        "departure_date": "2026-03-15",
+        "departure_date": "2026-04-15",
         "user_email": "test@example.com",
     })
     assert response.status_code == 200
