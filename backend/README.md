@@ -5,6 +5,24 @@ FastAPI backend serving real flight data from Google Cloud Storage.
 ## Quick Start
 ```bash
 python -m venv .venv
+```
+
+Windows PowerShell:
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Windows Git Bash:
+```bash
+source .venv/Scripts/activate
+```
+
+macOS/Linux:
+```bash
+source .venv/bin/activate
+```
+
+```bash
 python -m pip install -e ".[backend,dev]"
 python -m flightwatch_backend.api
 ```
@@ -15,11 +33,15 @@ API runs at http://localhost:8000
 
 1. **Get GCP access** - Ask a teammate for the service account key file (`service-account-key.json`)
 2. **Place the key** in the `backend/` directory
-3. **Copy environment config**:
+3. **Activate the virtual environment**:
+   Windows PowerShell: `.\.venv\Scripts\Activate.ps1`
+   Windows Git Bash: `source .venv/Scripts/activate`
+   macOS/Linux: `source .venv/bin/activate`
+4. **Copy environment config**:
 ```bash
    cp .env.example .env
 ```
-4. **Run the backend** with `python -m flightwatch_backend.api`
+5. **Run the backend** with `python -m flightwatch_backend.api`
 
 ## API Endpoints
 

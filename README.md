@@ -48,21 +48,34 @@ Lanes
    ```bash
    python -m venv .venv
    ```
-4. **Install Python dependencies from the repo root**:
+4. **Activate the virtual environment**:
+   Windows PowerShell:
+   ```powershell
+   .\.venv\Scripts\Activate.ps1
+   ```
+   Windows Git Bash:
+   ```bash
+   source .venv/Scripts/activate
+   ```
+   macOS/Linux:
+   ```bash
+   source .venv/bin/activate
+   ```
+5. **Install Python dependencies from the repo root**:
    ```bash
    python -m pip install -e ".[backend,dev]"
    ```
-5. **Copy environment config**:
+6. **Copy environment config**:
    ```bash
    cd backend
    cp .env.example .env
    ```
-6. **Update `.env`**: Make sure `GCS_BUCKET` and `GCS_FILE_PATH` are set correctly.
-7. **Run the backend**:
+7. **Update `.env`**: Make sure `GCS_BUCKET` and `GCS_FILE_PATH` are set correctly.
+8. **Run the backend**:
    ```bash
    python -m flightwatch_backend.api
    ```
-8. **Access the Application**:
+9. **Access the Application**:
    - API: http://localhost:8000
    - Frontend: http://localhost:8000/frontend/simple_search.html
 
