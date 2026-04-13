@@ -139,3 +139,114 @@ def test_tracks_returns_503_when_firestore_is_unavailable(client, monkeypatch):
 def test_normalize_date_text_accepts_slash_format():
     assert normalize_date_text("04/08/2026") == "2026-04-08"
     assert normalize_date_text("2026-04-08T09:00:00") == "2026-04-08"
+
+
+def test_data_range_endpoint(client):
+    response = client.get("/api/data-range")
+    assert response.status_code == 200
+    data = response.json()
+    assert "earliest_date" in data
+    assert "latest_date" in data
+    assert "record_count" in data
+
+
+def test_search_date_fallback(client):
+    """Search for a date outside GCS range still returns GCS data (not mock)."""
+    response = client.get("/api/search", params={
+        "origin": "JFK",
+        "destination": "ORD",
+        "departure_date": "2026-06-15",
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["source"] in ("gcs", "mock")
+    assert len(data["flights"]) > 0
+
+
+def test_search_exact_date(client):
+    """Search for a date within GCS range returns exact matches."""
+    response = client.get("/api/search", params={
+        "origin": "JFK",
+        "destination": "ORD",
+        "departure_date": "2026-03-15",
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["source"] == "gcs"
+    assert len(data["flights"]) > 0
+    assert "date_note" not in data
+
+
+def test_create_track(client, monkeypatch):
+    monkeypatch.setattr(firestore_logic, "get_db", lambda: None)
+    import app_simple_gcs
+    monkeypatch.setattr(
+        "firestore_logic.create_tracked_flight",
+        lambda **kwargs: "fake-doc-id",
+    )
+    response = client.post("/api/tracks", params={
+        "origin": "JFK",
+        "destination": "ORD",
+        "departure_date": "2026-03-15",
+        "user_email": "test@example.com",
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["doc_id"] == "fake-doc-id"
+    assert data["origin"] == "JFK"
+
+
+def test_predict_with_baseline(client):
+    """Predict endpoint returns baseline data when origin/destination are provided."""
+    payload = {
+        "origin": "JFK",
+        "destination": "ORD",
+        "current_best_price": 100,
+        "current_avg_price": 150,
+        "current_price_spread": 80,
+        "volatility_score": 0.1,
+        "days_until_departure": 20,
+        "current_flights": [],
+    }
+    response = client.post("/api/predict", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["model_status"] == "gcs-baseline-v1"
+    assert "historical_median" in data
+    assert "buy_signal" in data
+    assert data["buy_signal"] in ("great_deal", "good_price", "typical", "high")
+    assert "sample_size" in data
+    assert data["sample_size"] > 0
+
+
+def test_route_baseline_math():
+    """Verify baseline computation returns correct stats."""
+    from gcs_data_service_simple import GCSDataServiceSimple
+    svc = GCSDataServiceSimple()
+    svc.data_cache = [
+        {"origin": "TST", "destination": "DST", "total_price": "100"},
+        {"origin": "TST", "destination": "DST", "total_price": "200"},
+        {"origin": "TST", "destination": "DST", "total_price": "300"},
+        {"origin": "TST", "destination": "DST", "total_price": "400"},
+        {"origin": "TST", "destination": "DST", "total_price": "500"},
+    ]
+    baseline = svc.get_route_baseline("TST", "DST")
+    assert baseline is not None
+    assert baseline["median"] == 300  # odd count: middle value
+    assert baseline["min"] == 100
+    assert baseline["max"] == 500
+    assert baseline["sample_size"] == 5
+    assert baseline["p25"] == 200
+    assert baseline["p75"] == 400
+
+    # Test even count: median should be average of two middle values
+    svc2 = GCSDataServiceSimple()
+    svc2.data_cache = [
+        {"origin": "AA", "destination": "BB", "total_price": "100"},
+        {"origin": "AA", "destination": "BB", "total_price": "200"},
+        {"origin": "AA", "destination": "BB", "total_price": "300"},
+        {"origin": "AA", "destination": "BB", "total_price": "400"},
+    ]
+    b2 = svc2.get_route_baseline("AA", "BB")
+    assert b2 is not None
+    assert b2["median"] == 250  # (200 + 300) / 2

@@ -576,6 +576,198 @@
             background: #aab2c0;
         }
 
+        .flight-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 8px;
+        }
+
+        .track-btn {
+            background: none;
+            border: 1.5px solid #667eea;
+            color: #667eea;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .track-btn:hover {
+            background: #667eea;
+            color: #fff;
+        }
+
+        /* Track Modal */
+        .track-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .track-overlay.active {
+            display: flex;
+        }
+
+        .track-modal {
+            background: #fff;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 420px;
+            width: 90%;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+
+        .track-modal h3 {
+            margin: 0 0 6px;
+            font-size: 18px;
+        }
+
+        .track-modal .track-route {
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 18px;
+        }
+
+        .track-modal input[type="email"] {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1.5px solid #ddd;
+            border-radius: 10px;
+            font-size: 15px;
+            margin-bottom: 14px;
+            box-sizing: border-box;
+        }
+
+        .track-modal input[type="email"]:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+
+        .track-modal-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .track-modal-actions button {
+            flex: 1;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+        }
+
+        .track-submit-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+        }
+
+        .track-cancel-btn {
+            background: #f3f4f6;
+            color: #555;
+        }
+
+        .track-modal .track-status {
+            margin-top: 10px;
+            font-size: 13px;
+            min-height: 20px;
+        }
+
+        /* Tab bar */
+        .tab-bar {
+            display: flex;
+            gap: 0;
+            margin-top: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .tab {
+            padding: 10px 24px;
+            background: none;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            color: #999;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.15s ease;
+        }
+
+        .tab:hover { color: #667eea; }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .tab-badge {
+            background: #667eea;
+            color: #fff;
+            font-size: 11px;
+            padding: 1px 7px;
+            border-radius: 10px;
+            margin-left: 6px;
+        }
+
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        .tracked-card {
+            background: #f9f9f9;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 10px;
+            border-left: 4px solid #764ba2;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .tracked-card .tracked-route {
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .tracked-card .tracked-meta {
+            color: #777;
+            font-size: 13px;
+        }
+
+        .tracked-card .stop-btn {
+            background: none;
+            border: 1.5px solid #e74c3c;
+            color: #e74c3c;
+            padding: 5px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .tracked-card .stop-btn:hover {
+            background: #e74c3c;
+            color: #fff;
+        }
+
+        .tracked-empty {
+            color: #999;
+            font-size: 14px;
+            padding: 12px 0;
+        }
+
         .flight-actions {
             margin-top: 14px;
             display: flex;
@@ -1069,6 +1261,15 @@
             <button class="search-btn secondary" id="budget-explorer-btn" type="button">Explore Destinations by Budget</button>
         </div>
 
+        <!-- Tab bar -->
+        <div class="tab-bar">
+            <button class="tab active" id="tab-search" data-tab="search">Search</button>
+            <button class="tab" id="tab-tracked" data-tab="tracked">Tracked Flights <span class="tab-badge" id="tab-badge" style="display:none;">0</span></button>
+        </div>
+
+        <!-- Search tab content -->
+        <div class="tab-panel active" id="panel-search">
+
         <div class="map-wrap">
             <div class="section-title">
                 <div class="section-note" id="map-note"></div>
@@ -1083,9 +1284,6 @@
             </div>
 
             <div class="advisor-panel" id="advisor-panel">
-                <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:0.88rem;color:#664d03;">
-                    <strong>Demonstration Only</strong> -- These predictions are generated by a simple client-side heuristic, not a trained model. Do not make purchasing decisions based on this guidance.
-                </div>
                 <div class="advisor-top">
                     <div class="recommendation-wrap">
                         <h3>Recommendation</h3>
@@ -1157,6 +1355,33 @@
                 </div>
             </div>
             <div id="flights-container"></div>
+        </div>
+
+        </div><!-- end panel-search -->
+
+        <!-- Tracked flights tab content -->
+        <div class="tab-panel" id="panel-tracked">
+            <div class="tracked-empty-state" id="tracked-empty" style="text-align:center;padding:48px 20px;color:#999;">
+                <div style="font-size:48px;margin-bottom:12px;">&#9992;</div>
+                <div style="font-size:16px;font-weight:500;">No flights being tracked yet</div>
+                <div style="font-size:14px;margin-top:6px;">Search for flights and click "Track Price" to get email alerts on price drops</div>
+            </div>
+            <div id="tracked-list"></div>
+        </div>
+
+    </div>
+
+    <!-- Track Modal -->
+    <div class="track-overlay" id="track-overlay">
+        <div class="track-modal">
+            <h3>Track Price Drops</h3>
+            <div class="track-route" id="track-route-display"></div>
+            <input type="email" id="track-email" placeholder="Your email for alerts">
+            <div class="track-modal-actions">
+                <button class="track-cancel-btn" onclick="closeTrackModal()">Cancel</button>
+                <button class="track-submit-btn" id="track-submit-btn" onclick="submitTrack()">Start Tracking</button>
+            </div>
+            <div class="track-status" id="track-status"></div>
         </div>
     </div>
 
@@ -1435,7 +1660,6 @@
                 const response = await fetch(`${API_BASE}/airports`);
                 const data = await response.json();
                 allAirports = data.airports || [];
-                console.log(`Loaded ${allAirports.length} airports`);
             } catch (error) {
                 // If /airports isn't available (e.g., GCS not configured), we still let users type manually and search.
                 allAirports = [];
@@ -1537,6 +1761,130 @@
             await runPurchaseGuidance(latestSearchData);
         });
 
+        // --- Flight Tracking ---
+        let _trackOrigin = '', _trackDest = '', _trackDate = '', _trackPrice = 0;
+
+        function openTrackModal(origin, destination, date, price) {
+            _trackOrigin = origin;
+            _trackDest = destination;
+            _trackDate = date;
+            _trackPrice = price;
+            document.getElementById('track-route-display').textContent = `${origin} \u2192 ${destination} \u00b7 ${date}`;
+            document.getElementById('track-status').textContent = '';
+            document.getElementById('track-email').value = '';
+            document.getElementById('track-overlay').classList.add('active');
+        }
+
+        function closeTrackModal() {
+            document.getElementById('track-overlay').classList.remove('active');
+        }
+
+        async function submitTrack() {
+            const email = document.getElementById('track-email').value.trim();
+            if (!email || !email.includes('@')) {
+                document.getElementById('track-status').textContent = 'Please enter a valid email.';
+                document.getElementById('track-status').style.color = '#e74c3c';
+                return;
+            }
+            const btn = document.getElementById('track-submit-btn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+            document.getElementById('track-status').textContent = '';
+
+            try {
+                const params = new URLSearchParams({
+                    origin: _trackOrigin,
+                    destination: _trackDest,
+                    departure_date: _trackDate,
+                    user_email: email,
+                });
+                const resp = await fetch(`${API_BASE}/tracks?${params}`, { method: 'POST' });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.detail || `Error ${resp.status}`);
+                }
+                document.getElementById('track-status').textContent = 'Flight tracked! You will be emailed on price drops.';
+                document.getElementById('track-status').style.color = '#27ae60';
+                setTimeout(() => { closeTrackModal(); loadTrackedFlights(); }, 1200);
+            } catch (e) {
+                document.getElementById('track-status').textContent = e.message;
+                document.getElementById('track-status').style.color = '#e74c3c';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Start Tracking';
+            }
+        }
+
+        async function loadTrackedFlights() {
+            try {
+                const resp = await fetch(`${API_BASE}/tracks`);
+                if (!resp.ok) throw new Error('Could not load tracked flights');
+                const data = await resp.json();
+                const list = document.getElementById('tracked-list');
+                const emptyEl = document.getElementById('tracked-empty');
+                const badge = document.getElementById('tab-badge');
+
+                const count = (data.tracks || []).length;
+                badge.textContent = count;
+                badge.style.display = count > 0 ? 'inline' : 'none';
+
+                if (count === 0) {
+                    emptyEl.style.display = 'block';
+                    list.innerHTML = '';
+                    return;
+                }
+
+                emptyEl.style.display = 'none';
+                list.innerHTML = data.tracks.map((t) => {
+                    const price = t.latest_price != null ? formatCurrency(t.latest_price) : 'N/A';
+                    const emailShort = (t.user_email || '').replace(/(.{3}).*(@.*)/, '$1...$2');
+                    return `
+                    <div class="tracked-card">
+                        <div>
+                            <div class="tracked-route">${escapeHtml(t.origin || '')} \u2192 ${escapeHtml(t.destination || '')}</div>
+                            <div class="tracked-meta">${escapeHtml(t.departure_date || '')} \u00b7 Baseline: ${price} \u00b7 ${escapeHtml(emailShort)}</div>
+                        </div>
+                        <button class="stop-btn" data-track-id="${escapeHtml(t.id)}">Stop Tracking</button>
+                    </div>`;
+                }).join('');
+
+                list.querySelectorAll('.stop-btn').forEach(btn => {
+                    btn.addEventListener('click', () => deleteTrack(btn.dataset.trackId));
+                });
+            } catch (e) {
+                // Firestore may be unavailable
+            }
+        }
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+                if (tab.dataset.tab === 'tracked') loadTrackedFlights();
+            });
+        });
+
+        async function deleteTrack(trackId) {
+            try {
+                const resp = await fetch(`${API_BASE}/tracks/${trackId}`, { method: 'DELETE' });
+                if (!resp.ok) throw new Error('Delete failed');
+                loadTrackedFlights();
+            } catch (e) {
+                // Silently fail
+            }
+        }
+
+        // Close track modal on overlay click or Escape
+        document.getElementById('track-overlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeTrackModal();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.getElementById('track-overlay').classList.contains('active')) closeTrackModal();
+        });
+
         let isSearching = false;
         document.getElementById('search-button').addEventListener('click', async () => {
             if (isSearching) return;
@@ -1599,7 +1947,10 @@
                         departure_date: departureDate,
                         passengers: Number(passengers)
                     };
-                    showStatus(`Found ${data.flights.length} flights from ${data.source}`, 'success');
+                    const statusMsg = data.date_note
+                        ? `${data.date_note} (${data.flights.length} flights)`
+                        : `Found ${data.flights.length} flights from ${data.source}`;
+                    showStatus(statusMsg, data.date_note ? 'info' : 'success');
                     displayFlights(latestSearchData);
                     await runPurchaseGuidance(latestSearchData);
                 } else {
@@ -1678,7 +2029,7 @@
             return Math.max(0, Math.round((targetMs - todayMs) / (1000 * 60 * 60 * 24)));
         }
 
-        let detectedCurrency = 'USD';
+        let detectedCurrency = 'USD';  // Default to USD for demo (GCS data has EUR from Amadeus API)
 
         function formatCurrency(value) {
             const amount = Number(value || 0);
@@ -1880,7 +2231,55 @@
             document.getElementById('band-min').textContent = `Min ${formatCurrency(priceMin)}`;
             document.getElementById('band-current').textContent = `Best current ${formatCurrency(currentBest)}`;
             document.getElementById('band-max').textContent = `Max ${formatCurrency(priceMax)}`;
-            document.getElementById('advisor-note').textContent = `${payload.origin} → ${payload.destination} • ${sourceMode}`;
+            // Source label and baseline info
+            const isBaseline = prediction.model_status === 'gcs-baseline-v1';
+            document.getElementById('advisor-note').textContent = `${payload.origin} \u2192 ${payload.destination} \u00b7 ${isBaseline ? 'Data-driven' : sourceMode}`;
+
+            // Route history section (only when baseline data available)
+            let historyEl = document.getElementById('route-history');
+            if (!historyEl) {
+                historyEl = document.createElement('div');
+                historyEl.id = 'route-history';
+                historyEl.style.cssText = 'margin-top:16px;padding:14px;background:#f8f9fc;border-radius:10px;';
+                const rationaleEl = document.getElementById('rationale-text');
+                if (rationaleEl && rationaleEl.parentNode) {
+                    rationaleEl.parentNode.insertBefore(historyEl, rationaleEl.nextSibling);
+                }
+            }
+
+            if (isBaseline && prediction.historical_median) {
+                const signalColors = { great_deal: '#27ae60', good_price: '#3498db', typical: '#f39c12', high: '#e74c3c' };
+                const signalLabels = { great_deal: 'Great Deal', good_price: 'Good Price', typical: 'Typical', high: 'Above Average' };
+                const signal = prediction.buy_signal || 'typical';
+                const pct = prediction.pct_vs_baseline || 0;
+                const pctLabel = pct < 0 ? `${Math.abs(pct)}% below median` : `${pct}% above median`;
+
+                historyEl.innerHTML = `
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span style="font-weight:600;font-size:14px;">Route History</span>
+                        <span style="background:${signalColors[signal]};color:#fff;padding:3px 10px;border-radius:6px;font-size:12px;font-weight:600;">${signalLabels[signal]}</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:13px;">
+                        <div><div style="color:#999;">Historical Median</div><div style="font-weight:600;">${formatCurrency(prediction.historical_median)}</div></div>
+                        <div><div style="color:#999;">Price Range (P25-P75)</div><div style="font-weight:600;">${formatCurrency(prediction.price_p25)} - ${formatCurrency(prediction.price_p75)}</div></div>
+                        <div><div style="color:#999;">vs. Median</div><div style="font-weight:600;color:${signalColors[signal]};">${pctLabel}</div></div>
+                    </div>
+                    <div style="margin-top:8px;color:#999;font-size:12px;">Based on ${prediction.sample_size} flights on this route</div>
+                `;
+                historyEl.style.display = 'block';
+            } else {
+                historyEl.style.display = 'none';
+            }
+
+            // Update price band to use baseline percentiles when available
+            if (isBaseline && prediction.price_p25 && prediction.price_p75) {
+                const p25 = prediction.price_p25;
+                const p75 = prediction.price_p75;
+                const bandPctBaseline = (p75 <= p25) ? 50 : Math.max(4, Math.min(100, ((currentBest - p25) / (p75 - p25)) * 100));
+                document.getElementById('price-band-fill').style.width = `${bandPctBaseline}%`;
+                document.getElementById('band-min').textContent = `P25 ${formatCurrency(p25)}`;
+                document.getElementById('band-max').textContent = `P75 ${formatCurrency(p75)}`;
+            }
 
             panel.style.display = 'block';
         }
@@ -1892,10 +2291,7 @@
             const countEl = document.getElementById('results-count');
             const stats = getFlightStats(data.flights || []);
 
-            // Detect currency from the first flight with one
-            if (data.flights.length > 0) {
-                detectedCurrency = getCurrency(data.flights[0]);
-            }
+            // Keep USD for demo consistency (GCS batch data uses EUR from Amadeus API)
 
             titleEl.textContent = `Flights: ${data.origin} → ${data.destination}`;
             countEl.textContent = `${data.flights.length} flights`;
@@ -1963,7 +2359,10 @@
                             <div class="time">${escapeHtml(formatDateTime(arrival))}</div>
                         </div>
                     </div>
-                    <div class="duration">Duration: ${escapeHtml(duration)} • Aircraft: ${escapeHtml(aircraft)}</div>
+                    <div class="flight-footer">
+                        <div class="duration">Duration: ${escapeHtml(duration)} • Aircraft: ${escapeHtml(aircraft)}</div>
+                        <button class="track-btn" data-track-origin="${escapeHtml(origin)}" data-track-dest="${escapeHtml(destination)}" data-track-date="${escapeHtml(data.departure_date || '')}" data-track-price="${priceValue || 0}">Track Price</button>
+                    </div>
                 </div>
                 `;
             }).join('');
@@ -1981,6 +2380,14 @@
                         event.preventDefault();
                         window.open(bookingLink, '_blank', 'noopener,noreferrer');
                     }
+                });
+            });
+
+            // Track button event delegation (avoids inline onclick XSS risk)
+            container.querySelectorAll('.track-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openTrackModal(btn.dataset.trackOrigin, btn.dataset.trackDest, btn.dataset.trackDate, Number(btn.dataset.trackPrice));
                 });
             });
 
@@ -2312,11 +2719,28 @@
         // Initialize
         initMap();
         loadAirports();
+        loadTrackedFlights();
 
-        // Set default date to tomorrow
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        document.getElementById('departure-date').value = tomorrow.toISOString().split('T')[0];
+        // Set default date from available data range (fall back to tomorrow)
+        (async () => {
+            try {
+                const resp = await fetch(`${API_BASE}/data-range`);
+                const range = await resp.json();
+                if (range.earliest_date && range.latest_date) {
+                    const earliest = new Date(range.earliest_date + 'T00:00:00');
+                    const latest = new Date(range.latest_date + 'T00:00:00');
+                    const mid = new Date((earliest.getTime() + latest.getTime()) / 2);
+                    const picker = document.getElementById('departure-date');
+                    picker.value = mid.toISOString().split('T')[0];
+                    picker.min = range.earliest_date;
+                    picker.max = range.latest_date;
+                    return;
+                }
+            } catch (e) { /* fall through */ }
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            document.getElementById('departure-date').value = tomorrow.toISOString().split('T')[0];
+        })();
 
         // Auto-fill sample search
         setTimeout(() => {
