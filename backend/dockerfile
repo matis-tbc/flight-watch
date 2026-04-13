@@ -6,19 +6,22 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-WORKDIR /app/backend
+WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY backend/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+COPY pyproject.toml README.md ./
+COPY backend/src /app/backend/src
+RUN pip install --no-cache-dir ".[backend]"
 
 COPY backend /app/backend
 COPY frontend /app/frontend
 COPY scripts /app/scripts
+
+WORKDIR /app/backend
 
 RUN chmod +x /app/backend/start.sh
 

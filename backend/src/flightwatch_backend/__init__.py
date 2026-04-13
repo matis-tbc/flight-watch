@@ -1,0 +1,2 @@
+"""FlightWatch backend package."""
+

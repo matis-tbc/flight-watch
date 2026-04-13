@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flightwatch"
+version = "0.1.0"
+description = "Flight price predictor"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+backend = [
+    "amadeus==7.0.0",
+    "fastapi==0.104.1",
+    "flask==3.0.3",
+    "google-cloud-firestore==2.16.0",
+    "google-cloud-storage==2.16.0",
+    "gunicorn==22.0.0",
+    "python-dotenv==1.0.0",
+    "sendgrid==6.11.0",
+    "uvicorn==0.24.0",
+]
+scripts = [
+    "amadeus==7.0.0",
+    "boto3",
+    "db-types",
+    "google-cloud-bigquery",
+    "google-cloud-storage>=2.10.0",
+    "pandas",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+]
+dev = [
+    "httpx==0.25.2",
+    "pytest==8.3.4",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["backend/src"]
+testpaths = ["backend/tests"]
+
+[tool.setuptools]
+package-dir = {"" = "backend/src"}
+
+[tool.setuptools.packages.find]
+where = ["backend/src"]
+include = ["flightwatch_backend*"]

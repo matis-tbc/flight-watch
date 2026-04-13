@@ -27,10 +27,10 @@ Tech stack (current)
 
 Repo map
 - docs/          Product docs, decisions, meetings
-- backend/       FastAPI service outline
-- frontend/      React app outline
+- backend/       FastAPI app and scheduler code that runs in production
+- frontend/      Static frontend assets currently served by FastAPI
 - infra/         Cloud, env, deployment notes
-- scripts/       Helpers (seed, migrations, jobs)
+- scripts/       Standalone data collection and pipeline utilities
 
 Lanes
 - A Backend/API: endpoints, validation, swagger
@@ -44,22 +44,33 @@ Lanes
 
 1. **Get GCP access** - Ask a teammate for the service account key file (`service-account-key.json`).
 2. **Place the key** in the `backend/` directory.
-3. **Copy environment config**:
+3. **Create a virtual environment**:
+   ```bash
+   python -m venv .venv
+   ```
+4. **Install Python dependencies from the repo root**:
+   ```bash
+   python -m pip install -e ".[backend,dev]"
+   ```
+5. **Copy environment config**:
    ```bash
    cd backend
    cp .env.example .env
    ```
-4. **Update `.env`**: Make sure `GCS_BUCKET` and `GCS_FILE_PATH` are set correctly.
-5. **Run the backend**:
+6. **Update `.env`**: Make sure `GCS_BUCKET` and `GCS_FILE_PATH` are set correctly.
+7. **Run the backend**:
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   python3 app_simple_gcs.py
+   python -m flightwatch_backend.api
    ```
-6. **Access the Application**: 
+8. **Access the Application**:
    - API: http://localhost:8000
    - Frontend: http://localhost:8000/frontend/simple_search.html
+
+Python workspace notes
+- The repo is a small monorepo, not a single importable Python package.
+- `pyproject.toml` now lives at the repo root because dependencies are shared across `backend/` and `scripts/`.
+- The backend now follows a `src` layout at `backend/src/flightwatch_backend/`.
+- `backend/` still contains deployment files, tests, and a few legacy entrypoints, but the packaged modules under `backend/src/` are the source of truth.
 
 Next steps
 - Create repo structure (done here)
@@ -68,7 +79,7 @@ Next steps
 - Decide drop detection logic
 
 Deployment
-- Cloud Run deployment guide: [infra/README.md](/Users/sharonbayela/Documents/GitHub/flight-watch/infra/README.md)
+- Cloud Run deployment guide: `infra/README.md`
 
 Open questions
 - Drop logic: absolute, percent, or window low?
