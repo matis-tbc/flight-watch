@@ -9,12 +9,20 @@ import os
 import sys
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from firestore_logic import (
+    FirestoreConfigurationError,
+    delete_tracked_flight,
+    get_tracked_flights,
+    create_tracked_flight,
+    db,
+)
+from gcp_auth import resolve_google_application_credentials
+from date_utils import normalize_date_text
+import uvicorn
 
 BASE_DIR = os.path.dirname(__file__)
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
-from gcp_auth import resolve_google_application_credentials
-from date_utils import normalize_date_text
 
 resolve_google_application_credentials()
 
@@ -62,12 +70,6 @@ app.add_middleware(
 )
 
 app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
-
-from firestore_logic import (
-    FirestoreConfigurationError,
-    delete_tracked_flight,
-    get_tracked_flights,
-)
 
 
 @app.exception_handler(FirestoreConfigurationError)
@@ -384,8 +386,6 @@ async def create_track(
     The current price from GCS is fetched and stored as the baseline.
     When the scheduler runs and detects a lower price, it emails user_email.
     """
-    from firestore_logic import create_tracked_flight
-
     if not user_email:
         raise HTTPException(status_code=400, detail="user_email is required to receive price drop alerts.")
 
@@ -448,7 +448,6 @@ async def list_tracks():
 @app.get("/api/tracks/{track_id}")
 async def get_track(track_id: str):
     """Get a specific track by Firestore doc ID"""
-    from firestore_logic import db
     doc = db.collection("tracked_flights").document(track_id).get()
     if not doc.exists:
         raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
@@ -459,7 +458,6 @@ async def get_track(track_id: str):
 @app.delete("/api/tracks/{track_id}")
 async def delete_track(track_id: str):
     """Delete a track from Firestore"""
-    from firestore_logic import db
     doc = db.collection("tracked_flights").document(track_id).get()
     if not doc.exists:
         raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
@@ -594,14 +592,12 @@ def get_mock_flights(origin: str, destination: str, departure_date: Optional[str
         }
     ]
 
-if __name__ == "__main__":
-    import uvicorn
-    
+if __name__ == "__main__":    
     print("=" * 70)
     print("flightwatch api - gcs version")
     print("=" * 70)
     print(f"python: {sys.version.split()[0]}")
-    print(f"project: flightwatch-486618")
+    print("project: flightwatch-486618")
     print(f"gcs configured: {check_gcs_configured()}")
     print(f"amadeus configured: {check_amadeus_configured()}")
     

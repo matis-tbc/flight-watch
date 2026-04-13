@@ -1335,7 +1335,7 @@
             const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`;
 
             const res = await fetch(url, {
-                headers: { 'User-Agent': 'FlightWatch/1.0 (student project)' }
+                headers: { 'User-Agent': 'FlightWatch/1.0' }
             });
             if (!res.ok) throw new Error(`Geocode failed for ${code}`);
             const data = await res.json();
@@ -1599,7 +1599,8 @@
                         departure_date: departureDate,
                         passengers: Number(passengers)
                     };
-                    showStatus(`Found ${data.flights.length} flights from ${data.source}`, 'success');
+                    showStatus(`Found ${data.flights.length} flights`, 'success');
+                    console.log(`Found ${data.flights.length} flights from source: ${data.source}`);
                     displayFlights(latestSearchData);
                     await runPurchaseGuidance(latestSearchData);
                 } else {

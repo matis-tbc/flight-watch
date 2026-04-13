@@ -98,7 +98,15 @@ class GCSDataServiceSimple:
             filtered = [f for f in filtered if self._get_field(f, 'destination', 'dest_location', 'dest_code').upper() == destination]
         
         if departure_date:
-            filtered = [f for f in filtered if self._get_field(f, 'departure_datetime', 'departure_date', 'date', 'departure').startswith(departure_date)]
+            def matches_date(f):
+                raw = self._get_field(f, 'departure_datetime', 'departure_date', 'date', 'departure')
+                raw = raw.strip()
+                return (
+                    raw.startswith(departure_date) or
+                    departure_date in raw
+                )
+
+            filtered = [f for f in filtered if matches_date(f)]
         
         return filtered[:limit]
     
@@ -175,10 +183,15 @@ class GCSDataServiceSimple:
 
     def _get_field(self, record: Dict[str, Any], *field_names: str) -> str:
         """get field with fallback names"""
+        normalized = {
+            str(k).strip().lower().replace('\ufeff', ''): v
+            for k, v in record.items()
+        }
         for field in field_names:
-            if field in record:
-                value = record[field]
-                return str(value) if value is not None else ""
+            key = field.strip().lower()
+            if key in normalized:
+                value = normalized[key]
+                return str(value).strip() if value is not None else ""
         return ""
     
     def get_available_origins(self) -> List[str]:
