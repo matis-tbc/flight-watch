@@ -10,7 +10,7 @@ if [ "$SERVICE_MODE" = "scheduler" ]; then
     --workers "${GUNICORN_WORKERS:-1}" \
     --threads "${GUNICORN_THREADS:-8}" \
     --timeout "${GUNICORN_TIMEOUT:-120}" \
-    scheduler:app
+    flightwatch_backend.scheduler:app
 fi
 
-exec uvicorn app_simple_gcs:app --host 0.0.0.0 --port "${PORT}"
+exec uvicorn flightwatch_backend.api:app --host 0.0.0.0 --port "${PORT}"

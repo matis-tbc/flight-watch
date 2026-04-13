@@ -4,11 +4,27 @@ FastAPI backend serving real flight data from Google Cloud Storage.
 
 ## Quick Start
 ```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python3 app_simple_gcs.py
+python -m venv .venv
+```
+
+Windows PowerShell:
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Windows Git Bash:
+```bash
+source .venv/Scripts/activate
+```
+
+macOS/Linux:
+```bash
+source .venv/bin/activate
+```
+
+```bash
+python -m pip install -e ".[backend,dev]"
+python -m flightwatch_backend.api
 ```
 
 API runs at http://localhost:8000
@@ -17,11 +33,15 @@ API runs at http://localhost:8000
 
 1. **Get GCP access** - Ask a teammate for the service account key file (`service-account-key.json`)
 2. **Place the key** in the `backend/` directory
-3. **Copy environment config**:
+3. **Activate the virtual environment**:
+   Windows PowerShell: `.\.venv\Scripts\Activate.ps1`
+   Windows Git Bash: `source .venv/Scripts/activate`
+   macOS/Linux: `source .venv/bin/activate`
+4. **Copy environment config**:
 ```bash
    cp .env.example .env
 ```
-4. **Run the backend** (see Quick Start above)
+5. **Run the backend** with `python -m flightwatch_backend.api`
 
 ## API Endpoints
 
@@ -192,6 +212,12 @@ gcloud scheduler jobs create http "flightwatch-check-prices" \
 
 1. Pull latest changes: `git pull origin main`
 2. Activate virtual environment: `source venv/bin/activate`
-3. Install new dependencies if needed: `pip install -r requirements.txt`
-4. Run backend: `python3 app_simple_gcs.py`
+3. Install new dependencies if needed: `python -m pip install -e ".[backend,dev]"`
+4. Run backend: `python -m flightwatch_backend.api`
 5. Test with: `curl http://localhost:8000/health`
+
+## Project Structure
+
+- `backend/src/flightwatch_backend/` is the real Python package for the API and scheduler.
+- The repo-level `pyproject.toml` is the source of truth for Python dependencies.
+- `backend/` now mainly holds deployment files, tests, and compatibility entrypoints around the packaged code.

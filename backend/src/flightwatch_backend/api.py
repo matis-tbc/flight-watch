@@ -1,0 +1,544 @@
+#!/usr/bin/env python3
+"""Packaged FastAPI application."""
+import os
+import sys
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+import uvicorn
+
+from .date_utils import normalize_date_text
+from .firestore_logic import (
+    FirestoreConfigurationError,
+    create_tracked_flight,
+    db,
+    delete_tracked_flight,
+    get_tracked_flights,
+)
+from .gcp_auth import resolve_google_application_credentials
+from .gcs_data_service_simple import gcs_data_service_simple
+from .paths import ENV_FILE, FLIGHT_FETCH_DIR, FRONTEND_DIR
+
+load_dotenv(ENV_FILE)
+resolve_google_application_credentials()
+
+if str(FLIGHT_FETCH_DIR) not in sys.path:
+    sys.path.append(str(FLIGHT_FETCH_DIR))
+
+app = FastAPI(
+    title="flightwatch api",
+    description="flight price tracking with gcs data",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.mount("/frontend", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+
+
+@app.exception_handler(FirestoreConfigurationError)
+async def firestore_configuration_error_handler(_, exc: FirestoreConfigurationError):
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return Response(status_code=204)
+
+
+def check_amadeus_configured() -> bool:
+    return (
+        os.environ.get("AMADEUS_CLIENT_ID") is not None
+        and os.environ.get("AMADEUS_CLIENT_SECRET") is not None
+    )
+
+
+def check_gcs_configured() -> bool:
+    return gcs_data_service_simple.is_configured()
+
+
+@app.get("/")
+async def root():
+    gcs_configured = check_gcs_configured()
+    amadeus_configured = check_amadeus_configured()
+
+    data_sources = []
+    if gcs_configured:
+        data_sources.append("GCS (team's stored flight data)")
+    if amadeus_configured:
+        data_sources.append("Amadeus API (live flight data)")
+    if not data_sources:
+        data_sources.append("Mock data (development only)")
+
+    return {
+        "message": "FlightWatch API",
+        "version": "1.0.0",
+        "status": "running",
+        "python_version": sys.version.split()[0],
+        "data_sources": data_sources,
+        "project": "flightwatch-486618",
+        "note": "Using pandas-free GCS reader for Python 3.13 compatibility",
+        "endpoints": {
+            "health": "/health",
+            "search": "/api/search",
+            "tracks": "/api/tracks",
+            "gcs_info": "/api/gcs-info",
+            "docs": "/docs",
+        },
+    }
+
+
+@app.get("/health")
+async def health():
+    gcs_configured = check_gcs_configured()
+    amadeus_configured = check_amadeus_configured()
+
+    health_info = {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "service": "FlightWatch API",
+        "project": "flightwatch-486618",
+        "python_version": sys.version.split()[0],
+        "data_sources": {
+            "gcs": {
+                "configured": gcs_configured,
+                "status": "READY" if gcs_configured else "NOT CONFIGURED",
+                "note": "Team's stored flight data (CSV)" if gcs_configured else "Add GCS_BUCKET and GCS_FILE_PATH to .env",
+            },
+            "amadeus_api": {
+                "configured": amadeus_configured,
+                "status": "READY" if amadeus_configured else "NOT CONFIGURED",
+                "note": "Live Amadeus API data" if amadeus_configured else "Add AMADEUS_CLIENT_ID/SECRET to .env",
+            },
+            "mock_data": {
+                "available": True,
+                "status": "FALLBACK",
+                "note": "Used when no real data sources configured",
+            },
+        },
+        "primary_data_source": "GCS" if gcs_configured else "Amadeus" if amadeus_configured else "Mock",
+        "endpoints_working": True,
+        "docs_url": "/docs",
+    }
+
+    if gcs_configured:
+        try:
+            summary = gcs_data_service_simple.get_data_summary()
+            health_info["data_sources"]["gcs"]["data_summary"] = summary
+        except Exception as error:
+            health_info["data_sources"]["gcs"]["error"] = str(error)
+
+    return health_info
+
+
+@app.get("/api/gcs-info")
+async def gcs_info():
+    if not gcs_data_service_simple.is_configured():
+        return {
+            "status": "not_configured",
+            "message": "GCS not configured",
+            "required": {
+                "GCS_BUCKET": "Bucket name with flight data",
+                "GCS_FILE_PATH": "Path to CSV file in bucket",
+                "GOOGLE_APPLICATION_CREDENTIALS": "Path to service account key",
+            },
+            "project": "flightwatch-486618",
+            "note": "Ask your team for bucket name and file path",
+        }
+
+    summary = gcs_data_service_simple.get_data_summary()
+    origins = gcs_data_service_simple.get_available_origins()[:10]
+    destinations = gcs_data_service_simple.get_available_destinations()[:10]
+
+    return {
+        "status": "configured",
+        "project": "flightwatch-486618",
+        "data_summary": summary,
+        "available_origins_sample": origins,
+        "available_destinations_sample": destinations,
+        "total_origins": len(gcs_data_service_simple.get_available_origins()),
+        "total_destinations": len(gcs_data_service_simple.get_available_destinations()),
+        "sample_search": "/api/search?origin=JFK&destination=LAX&departure_date=2024-12-25",
+    }
+
+
+@app.get("/api/airports")
+async def get_airports():
+    if not gcs_data_service_simple.is_configured():
+        raise HTTPException(status_code=503, detail="GCS not configured or available")
+
+    origins = gcs_data_service_simple.get_available_origins()
+    destinations = gcs_data_service_simple.get_available_destinations()
+    all_airports = sorted(set(origins + destinations))
+
+    return {
+        "airports": all_airports,
+        "count": len(all_airports),
+        "origins_count": len(origins),
+        "destinations_count": len(destinations),
+        "sample_origins": origins[:10],
+        "sample_destinations": destinations[:10],
+    }
+
+
+@app.get("/api/airports/suggest")
+async def suggest_airports(q: str = "", limit: int = 10):
+    if not gcs_data_service_simple.is_configured():
+        raise HTTPException(status_code=503, detail="GCS not configured or available")
+
+    origins = gcs_data_service_simple.get_available_origins()
+    destinations = gcs_data_service_simple.get_available_destinations()
+    all_airports = sorted(set(origins + destinations))
+
+    if not q:
+        return {"suggestions": all_airports[:limit], "count": len(all_airports[:limit])}
+
+    q_lower = q.upper()
+    suggestions = [airport for airport in all_airports if q_lower in airport.upper()]
+
+    return {
+        "query": q,
+        "suggestions": suggestions[:limit],
+        "count": len(suggestions[:limit]),
+        "total_matches": len(suggestions),
+    }
+
+
+@app.get("/api/search")
+async def search_flights(
+    origin: str,
+    destination: str,
+    departure_date: Optional[str] = Query(None),
+    return_date: Optional[str] = Query(None),
+    passengers: int = 1,
+    limit: int = 50,
+):
+    actual_departure_date = normalize_date_text(departure_date)
+    normalized_return_date = normalize_date_text(return_date)
+    if not actual_departure_date:
+        actual_departure_date = datetime.now().strftime("%Y-%m-%d")
+
+    if check_gcs_configured():
+        try:
+            flights = gcs_data_service_simple.search_flights(
+                origin=origin,
+                destination=destination,
+                departure_date=actual_departure_date,
+                limit=limit,
+            )
+
+            if flights:
+                return {
+                    "origin": origin,
+                    "destination": destination,
+                    "departure_date": actual_departure_date,
+                    "return_date": normalized_return_date,
+                    "passengers": passengers,
+                    "flights": flights[:limit],
+                    "source": "gcs",
+                    "count": len(flights),
+                    "status": "success: gcs flight data",
+                    "note": f"found {len(flights)} flights from gcs",
+                }
+        except Exception as error:
+            print(f"gcs search error: {error}")
+
+    if check_amadeus_configured():
+        try:
+            from flight_fetcher import authenticate_amadeus, search_flights as amadeus_search
+
+            amadeus_client = authenticate_amadeus()
+            flight_data = amadeus_search(
+                amadeus_client,
+                origin,
+                destination,
+                actual_departure_date,
+                normalized_return_date,
+                passengers,
+            )
+            flight_count = len(flight_data) if flight_data else 0
+
+            return {
+                "origin": origin,
+                "destination": destination,
+                "departure_date": actual_departure_date,
+                "return_date": normalized_return_date,
+                "passengers": passengers,
+                "flights": format_flight_data(flight_data)[:limit],
+                "source": "amadeus",
+                "count": flight_count,
+                "status": "SUCCESS: Live Amadeus API data",
+                "note": f"Found {flight_count} live flights from Amadeus API",
+            }
+        except Exception as error:
+            print(f"Amadeus search error: {error}")
+
+    return {
+        "origin": origin,
+        "destination": destination,
+        "departure_date": actual_departure_date,
+        "return_date": normalized_return_date,
+        "passengers": passengers,
+        "flights": get_mock_flights(origin, destination, actual_departure_date)[:limit],
+        "source": "mock",
+        "status": "WARNING: Using mock data",
+        "note": "Configure GCS or Amadeus for real flight data",
+    }
+
+
+@app.get("/api/explore")
+async def explore_destinations(
+    origin: str,
+    max_price: float = Query(..., gt=0),
+    departure_date: Optional[str] = Query(None),
+):
+    origin = origin.strip().upper()
+    normalized_departure_date = normalize_date_text(departure_date)
+
+    if gcs_data_service_simple.is_configured():
+        destinations = gcs_data_service_simple.explore_destinations(
+            origin=origin,
+            max_price=max_price,
+            departure_date=normalized_departure_date,
+        )
+        return {
+            "origin": origin,
+            "max_price": max_price,
+            "departure_date": normalized_departure_date,
+            "destination_count": len(destinations),
+            "destinations": destinations,
+            "source": "gcs",
+        }
+
+    return {
+        "origin": origin,
+        "max_price": max_price,
+        "departure_date": normalized_departure_date,
+        "destination_count": 3,
+        "destinations": [
+            {"destination": "LAX", "cheapest_price": 132.99, "currency": "USD", "airline": "B6", "flight_count": 8, "sample_flight": {}},
+            {"destination": "MIA", "cheapest_price": 189.50, "currency": "USD", "airline": "AA", "flight_count": 5, "sample_flight": {}},
+            {"destination": "ORD", "cheapest_price": 95.00, "currency": "USD", "airline": "UA", "flight_count": 12, "sample_flight": {}},
+        ],
+        "source": "mock",
+    }
+
+
+@app.post("/api/tracks")
+async def create_track(
+    origin: str,
+    destination: str,
+    departure_date: str,
+    user_email: str,
+    return_date: Optional[str] = None,
+    max_price: Optional[float] = None,
+):
+    if not user_email:
+        raise HTTPException(status_code=400, detail="user_email is required to receive price drop alerts.")
+
+    normalized_departure_date = normalize_date_text(departure_date)
+    normalized_return_date = normalize_date_text(return_date)
+    if not normalized_departure_date:
+        raise HTTPException(status_code=400, detail="departure_date is required.")
+
+    flights = gcs_data_service_simple.search_flights(
+        origin=origin,
+        destination=destination,
+        departure_date=normalized_departure_date,
+        limit=1,
+    )
+
+    latest_price = None
+    if flights:
+        raw = flights[0].get("price")
+        if isinstance(raw, dict):
+            raw = raw.get("total")
+        try:
+            latest_price = float(str(raw).replace(",", "").strip()) if raw else None
+        except (TypeError, ValueError):
+            latest_price = None
+
+    doc_id = create_tracked_flight(
+        user_email=user_email,
+        origin=origin,
+        destination=destination,
+        departure_date=normalized_departure_date,
+        latest_price=latest_price,
+        return_date=normalized_return_date,
+    )
+
+    return {
+        "message": "Flight is now being tracked. You'll be emailed if the price drops.",
+        "doc_id": doc_id,
+        "user_email": user_email,
+        "origin": origin.upper(),
+        "destination": destination.upper(),
+        "departure_date": normalized_departure_date,
+        "return_date": normalized_return_date,
+        "baseline_price": latest_price,
+        "max_price": max_price,
+    }
+
+
+@app.get("/api/tracks")
+async def list_tracks():
+    tracks = []
+    for doc in get_tracked_flights():
+        track_data = doc.to_dict()
+        track_data["id"] = doc.id
+        tracks.append(track_data)
+    return {"count": len(tracks), "tracks": tracks}
+
+
+@app.get("/api/tracks/{track_id}")
+async def get_track(track_id: str):
+    doc = db.collection("tracked_flights").document(track_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
+    track_data = doc.to_dict()
+    track_data["id"] = doc.id
+    return track_data
+
+
+@app.delete("/api/tracks/{track_id}")
+async def delete_track(track_id: str):
+    doc = db.collection("tracked_flights").document(track_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
+    delete_tracked_flight(track_id)
+    return {"message": f"Track {track_id} deleted"}
+
+
+@app.post("/api/predict")
+async def predict_price(payload: dict):
+    best = float(payload.get("current_best_price") or 0)
+    avg = float(payload.get("current_avg_price") or best)
+    spread = float(payload.get("current_price_spread") or 0)
+    volatility = float(payload.get("volatility_score") or 0)
+    days = int(payload.get("days_until_departure") or 0)
+
+    if best <= 0:
+        return {
+            "recommendation": "NO DATA",
+            "confidence": 0,
+            "predicted_lowest_price": 0,
+            "expected_dip_window": "No pricing data available",
+            "estimated_savings": 0,
+            "rationale": "No valid prices were found for this route. Try a different date or route.",
+            "model_status": "python-heuristic-v1",
+            "price_floor": 0,
+            "price_ceiling": 0,
+            "current_best_price": 0,
+            "source_mode": "model",
+        }
+
+    recommendation = "WATCH CLOSELY"
+    confidence = 0.62
+    savings_pct = 0.05
+    rationale = "Prices are neither extremely compressed nor clearly falling yet, so monitoring for a better entry point is reasonable."
+
+    if days <= 10:
+        recommendation = "BUY NOW"
+        confidence = 0.84
+        savings_pct = 0.01
+        rationale = "Departure is close, so the downside of waiting is higher than the likely savings from a short-lived dip."
+    elif volatility >= 0.18 and days >= 14:
+        recommendation = "WAIT"
+        confidence = 0.76
+        savings_pct = 0.08
+        rationale = "This route shows a wide fare spread and enough time before departure, which increases the odds of another softer pricing window."
+    elif best <= avg * 0.92:
+        recommendation = "BUY NOW"
+        confidence = 0.72
+        savings_pct = 0.02
+        rationale = "The current best fare is already meaningfully below the route average, so it looks like a strong available deal."
+    elif days <= 21:
+        recommendation = "WATCH CLOSELY"
+        confidence = 0.69
+        savings_pct = 0.04
+        rationale = "There may still be modest movement, but the departure date is approaching quickly enough that waiting should be limited."
+
+    estimated_savings = max(0, round(min(spread * 0.45, avg * savings_pct)))
+    predicted_lowest = max(0, round(best - estimated_savings))
+
+    return {
+        "recommendation": recommendation,
+        "confidence": confidence,
+        "predicted_lowest_price": predicted_lowest or best,
+        "expected_dip_window": "Current fare is already attractive" if recommendation == "BUY NOW" else f"{days - 5} to {days} days out",
+        "estimated_savings": estimated_savings,
+        "rationale": rationale,
+        "model_status": "python-heuristic-v1",
+        "price_floor": best,
+        "price_ceiling": best + spread,
+        "current_best_price": best,
+        "source_mode": "model",
+    }
+
+
+def format_flight_data(flight_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not flight_data:
+        return []
+
+    formatted = []
+    for flight in flight_data:
+        formatted.append({
+            "id": flight.get("id"),
+            "price": flight.get("price", {}),
+            "itineraries": flight.get("itineraries", []),
+            "airlines": flight.get("validatingAirlineCodes", []),
+            "bookable_seats": flight.get("numberOfBookableSeats"),
+            "source": "amadeus",
+        })
+    return formatted
+
+
+def get_mock_flights(origin: str, destination: str, departure_date: Optional[str] = None) -> List[Dict[str, Any]]:
+    if not departure_date:
+        departure_date = datetime.now().strftime("%Y-%m-%d")
+
+    return [
+        {
+            "id": "mock-1",
+            "airline": "American Airlines",
+            "flight_number": "AA1234",
+            "departure": f"{departure_date}T08:00:00",
+            "arrival": f"{departure_date}T11:00:00",
+            "duration": "3h",
+            "price": {"total": "299.99", "currency": "USD"},
+            "stops": 0,
+            "source": "mock",
+        },
+        {
+            "id": "mock-2",
+            "airline": "Delta",
+            "flight_number": "DL5678",
+            "departure": f"{departure_date}T14:00:00",
+            "arrival": f"{departure_date}T17:00:00",
+            "duration": "3h",
+            "price": {"total": "349.99", "currency": "USD"},
+            "stops": 0,
+            "source": "mock",
+        },
+    ]
+
+
+def main():
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+if __name__ == "__main__":
+    main()

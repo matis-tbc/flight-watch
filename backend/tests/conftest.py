@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from app_simple_gcs import app
+from flightwatch_backend.api import app
 
 
 @pytest.fixture

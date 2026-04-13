@@ -1,6 +1,6 @@
 """Tests for FlightWatch API endpoints."""
-import firestore_logic
-from date_utils import normalize_date_text
+import flightwatch_backend.firestore_logic as firestore_logic
+from flightwatch_backend.date_utils import normalize_date_text
 
 
 def test_health(client):
