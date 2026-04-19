@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """flightwatch api - gcs support, no pandas, python 3.13"""
-from fastapi import FastAPI, HTTPException, Query, Response
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Header, HTTPException, Query, Response
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
@@ -134,6 +134,62 @@ def check_amadeus_configured() -> bool:
 def check_gcs_configured() -> bool:
     """check gcs config"""
     return GCS_AVAILABLE and gcs_data_service_simple.is_configured()
+
+
+def _get_admin_token() -> str:
+    return os.getenv("ADMIN_TOKEN", "").strip()
+
+
+def _validate_admin_token(raw_token: Optional[str]) -> bool:
+    expected = _get_admin_token()
+    return bool(expected and raw_token and raw_token.strip() == expected)
+
+
+def _require_admin_token(raw_token: Optional[str]) -> None:
+    if not _validate_admin_token(raw_token):
+        raise HTTPException(status_code=401, detail="Valid admin token required.")
+
+
+def _group_tracks_by_route(track_docs, include_admin_fields: bool = False) -> List[Dict[str, Any]]:
+    grouped: Dict[tuple, Dict[str, Any]] = {}
+
+    for doc in track_docs:
+        track_data = doc.to_dict() or {}
+        key = (
+            track_data.get("origin"),
+            track_data.get("destination"),
+            track_data.get("departure_date"),
+        )
+        if key not in grouped:
+            grouped[key] = {
+                "origin": track_data.get("origin"),
+                "destination": track_data.get("destination"),
+                "departure_date": track_data.get("departure_date"),
+                "subscriber_count": 0,
+            }
+            if include_admin_fields:
+                grouped[key]["track_ids"] = []
+                grouped[key]["subscribers"] = []
+
+        grouped[key]["subscriber_count"] += 1
+        if include_admin_fields:
+            grouped[key]["track_ids"].append(doc.id)
+            grouped[key]["subscribers"].append({
+                "id": doc.id,
+                "user_email": track_data.get("user_email"),
+                "latest_price": track_data.get("latest_price"),
+                "adults": track_data.get("adults", 1),
+            })
+
+    grouped_routes = sorted(
+        grouped.values(),
+        key=lambda item: (
+            item.get("departure_date") or "",
+            item.get("origin") or "",
+            item.get("destination") or "",
+        ),
+    )
+    return grouped_routes
 
 
 def _normalize_passenger_count(passengers: int) -> int:
@@ -551,21 +607,74 @@ async def create_track(
     }
 
 @app.get("/api/tracks")
-async def list_tracks():
-    """List all flight tracks from Firestore"""
-    tracks = []
-    for doc in get_tracked_flights():
-        track_data = doc.to_dict()
-        track_data["id"] = doc.id
-        tracks.append(track_data)
+async def list_tracks(x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token")):
+    """List tracked routes, with admin controls only when a valid admin token is supplied."""
+    is_admin = False
+    if x_admin_token is not None:
+        _require_admin_token(x_admin_token)
+        is_admin = True
+
+    track_docs = list(get_tracked_flights())
+    tracks = _group_tracks_by_route(track_docs, include_admin_fields=is_admin)
+
     return {
-        "count": len(tracks),
-        "tracks": tracks
+        "count": len(track_docs),
+        "route_count": len(tracks),
+        "tracks": tracks,
+        "admin_view": is_admin,
+    }
+
+
+@app.get("/api/tracks/details")
+async def track_details(
+    origin: str,
+    destination: str,
+    departure_date: str,
+    track_ids: Optional[str] = Query(None),
+    x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token"),
+):
+    """Return per-subscriber tracked-flight records for a specific route."""
+    _require_admin_token(x_admin_token)
+    normalized_departure_date = normalize_date_text(departure_date) or departure_date
+    requested_track_ids = {
+        part.strip() for part in str(track_ids or "").split(",")
+        if part and part.strip()
+    }
+
+    details = []
+    for doc in get_tracked_flights():
+        track_data = doc.to_dict() or {}
+        stored_departure_date = normalize_date_text(track_data.get("departure_date")) or (track_data.get("departure_date") or "")
+        matches_route = (
+            (track_data.get("origin") or "").strip().upper() == origin.strip().upper()
+            and (track_data.get("destination") or "").strip().upper() == destination.strip().upper()
+            and stored_departure_date == normalized_departure_date
+        )
+        matches_track_id = bool(requested_track_ids) and doc.id in requested_track_ids
+
+        if matches_track_id or matches_route:
+            details.append({
+                "id": doc.id,
+                "user_email": track_data.get("user_email"),
+                "origin": track_data.get("origin"),
+                "destination": track_data.get("destination"),
+                "departure_date": track_data.get("departure_date"),
+                "latest_price": track_data.get("latest_price"),
+                "adults": track_data.get("adults", 1),
+            })
+
+    return {
+        "count": len(details),
+        "origin": origin.upper(),
+        "destination": destination.upper(),
+        "departure_date": normalized_departure_date,
+        "tracks": details,
     }
 
 @app.get("/api/tracks/{track_id}")
-async def get_track(track_id: str):
+async def get_track(track_id: str, x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token")):
     """Get a specific track by Firestore doc ID"""
+    _require_admin_token(x_admin_token)
     doc = db.collection("tracked_flights").document(track_id).get()
     if not doc.exists:
         raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
@@ -574,8 +683,9 @@ async def get_track(track_id: str):
     return track_data
 
 @app.delete("/api/tracks/{track_id}")
-async def delete_track(track_id: str):
+async def delete_track(track_id: str, x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token")):
     """Delete a track from Firestore"""
+    _require_admin_token(x_admin_token)
     doc = db.collection("tracked_flights").document(track_id).get()
     if not doc.exists:
         raise HTTPException(status_code=404, detail=f"Track {track_id} not found")

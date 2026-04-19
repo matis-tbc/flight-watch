@@ -828,10 +828,193 @@
             color: #fff;
         }
 
+        .subscriber-card .stop-btn {
+            width: auto;
+            background: none;
+            border: 1.5px solid #e74c3c;
+            color: #e74c3c;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .subscriber-card .stop-btn:hover {
+            background: #e74c3c;
+            color: #fff;
+        }
+
         .tracked-empty {
             color: #999;
             font-size: 14px;
             padding: 12px 0;
+        }
+
+        .tracked-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .tracked-summary {
+            color: #555;
+        }
+
+        .tracked-summary strong {
+            color: #222;
+        }
+
+        .tracked-admin-actions {
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .admin-btn {
+            width: auto;
+            padding: 8px 14px;
+            border-radius: 999px;
+            border: 1.5px solid #cfd6f6;
+            background: #fff;
+            color: #4453b3;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .admin-btn:hover {
+            background: #f7f8ff;
+        }
+
+        .admin-route-btn {
+            width: auto;
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1.5px solid #cfd6f6;
+            background: #fff;
+            color: #4453b3;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .admin-route-btn:hover {
+            background: #f7f8ff;
+        }
+
+        .admin-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            z-index: 2100;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .admin-overlay.active {
+            display: flex;
+        }
+
+        .admin-modal {
+            background: #fff;
+            border-radius: 16px;
+            padding: 28px;
+            width: min(460px, 100%);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+
+        .admin-modal h3 {
+            margin: 0 0 8px;
+            font-size: 20px;
+        }
+
+        .admin-modal-subtitle {
+            color: #667085;
+            margin-bottom: 18px;
+            line-height: 1.5;
+        }
+
+        .admin-modal input[type="password"] {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1.5px solid #d0d7e2;
+            border-radius: 10px;
+            font-size: 15px;
+            margin-bottom: 14px;
+        }
+
+        .admin-modal input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .admin-modal-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .admin-modal-actions button {
+            flex: 1;
+            border: none;
+            border-radius: 10px;
+            padding: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .admin-modal-cancel {
+            background: #f3f4f6;
+            color: #555;
+        }
+
+        .admin-modal-submit {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+        }
+
+        .admin-modal-status {
+            min-height: 20px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        .subscriber-list {
+            display: grid;
+            gap: 10px;
+            max-height: 360px;
+            overflow-y: auto;
+            margin-top: 16px;
+        }
+
+        .subscriber-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border: 1px solid #e8ebf4;
+            border-radius: 12px;
+            background: #fafbff;
+        }
+
+        .subscriber-email {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .subscriber-meta {
+            color: #777;
+            font-size: 13px;
+            margin-top: 4px;
         }
 
         .flight-actions {
@@ -1500,6 +1683,12 @@
 
         <!-- Tracked flights tab content -->
         <div class="tab-panel" id="panel-tracked">
+            <div class="tracked-toolbar">
+                <div class="tracked-summary" id="tracked-summary"><strong>0 flights</strong> currently being tracked</div>
+                <div class="tracked-admin-actions">
+                    <button class="admin-btn" id="tracked-admin-btn" type="button">Manage Subscriptions</button>
+                </div>
+            </div>
             <div class="tracked-empty-state" id="tracked-empty" style="text-align:center;padding:48px 20px;color:#999;">
                 <div style="font-size:48px;margin-bottom:12px;">&#9992;</div>
                 <div style="font-size:16px;font-weight:500;">No flights being tracked yet</div>
@@ -1521,6 +1710,31 @@
                 <button class="track-submit-btn" id="track-submit-btn" onclick="submitTrack()">Start Tracking</button>
             </div>
             <div class="track-status" id="track-status"></div>
+        </div>
+    </div>
+
+    <div class="admin-overlay" id="admin-auth-overlay">
+        <div class="admin-modal">
+            <h3>Admin Sign-In</h3>
+            <div class="admin-modal-subtitle">Enter the admin password to unlock tracked-flight management.</div>
+            <input type="password" id="admin-password-input" placeholder="Admin password">
+            <div class="admin-modal-actions">
+                <button class="admin-modal-cancel" id="admin-auth-cancel-btn" type="button">Cancel</button>
+                <button class="admin-modal-submit" id="admin-auth-submit-btn" type="button">Sign In</button>
+            </div>
+            <div class="admin-modal-status" id="admin-auth-status"></div>
+        </div>
+    </div>
+
+    <div class="admin-overlay" id="route-admin-overlay">
+        <div class="admin-modal">
+            <h3>Tracked Subscribers</h3>
+            <div class="admin-modal-subtitle" id="route-admin-subtitle">Route details</div>
+            <div class="subscriber-list" id="route-admin-list"></div>
+            <div class="admin-modal-actions" style="margin-top:16px;">
+                <button class="admin-modal-cancel" id="route-admin-close-btn" type="button">Close</button>
+            </div>
+            <div class="admin-modal-status" id="route-admin-status"></div>
         </div>
     </div>
 
@@ -1944,6 +2158,10 @@
         });
 
         // --- Flight Tracking ---
+        let trackedAdminToken = sessionStorage.getItem('flightwatchAdminToken') || '';
+        let trackedAdminMode = false;
+        let currentTrackedRoutes = [];
+        let currentRouteAdminRoute = null;
         let _trackOrigin = '', _trackDest = '', _trackDate = '', _trackPrice = 0;
 
         function openTrackModal(origin, destination, date, price) {
@@ -2001,16 +2219,29 @@
 
         async function loadTrackedFlights() {
             try {
-                const resp = await fetch(`${API_BASE}/tracks`);
+                const headers = trackedAdminToken ? { 'X-Admin-Token': trackedAdminToken } : {};
+                const resp = await fetch(`${API_BASE}/tracks`, { headers });
+                if (resp.status === 401 && trackedAdminToken) {
+                    trackedAdminToken = '';
+                    trackedAdminMode = false;
+                    sessionStorage.removeItem('flightwatchAdminToken');
+                    updateTrackedAdminUi();
+                    return loadTrackedFlights();
+                }
                 if (!resp.ok) throw new Error('Could not load tracked flights');
                 const data = await resp.json();
                 const list = document.getElementById('tracked-list');
                 const emptyEl = document.getElementById('tracked-empty');
                 const badge = document.getElementById('tab-badge');
+                trackedAdminMode = Boolean(data.admin_view);
+                updateTrackedAdminUi();
 
-                const count = (data.tracks || []).length;
+                const groupedTracks = normalizeTrackedRoutes(data.tracks || []);
+                currentTrackedRoutes = groupedTracks;
+                const count = groupedTracks.length;
                 badge.textContent = count;
                 badge.style.display = count > 0 ? 'inline' : 'none';
+                document.getElementById('tracked-summary').innerHTML = `<strong>${count} route${count === 1 ? '' : 's'}</strong> currently being tracked`;
 
                 if (count === 0) {
                     emptyEl.style.display = 'block';
@@ -2019,25 +2250,254 @@
                 }
 
                 emptyEl.style.display = 'none';
-                list.innerHTML = data.tracks.map((t) => {
-                    const price = t.latest_price != null ? formatCurrency(t.latest_price) : 'N/A';
-                    const emailShort = (t.user_email || '').replace(/(.{3}).*(@.*)/, '$1...$2');
+                list.innerHTML = groupedTracks.map((t) => {
+                    const formattedDate = formatTrackedDate(t.departure_date);
+                    const subscriberText = `${Number(t.subscriber_count || 0)} subscriber${Number(t.subscriber_count || 0) === 1 ? '' : 's'}`;
+                    const adminAction = trackedAdminMode
+                        ? `<button class="admin-route-btn" data-route-origin="${escapeHtml(t.origin || '')}" data-route-destination="${escapeHtml(t.destination || '')}" data-route-date="${escapeHtml(t.departure_date || '')}" data-route-track-ids="${escapeHtml((t.track_ids || []).join(','))}">Manage Subscribers</button>`
+                        : '';
                     return `
                     <div class="tracked-card">
                         <div>
                             <div class="tracked-route">${escapeHtml(t.origin || '')} \u2192 ${escapeHtml(t.destination || '')}</div>
-                            <div class="tracked-meta">${escapeHtml(t.departure_date || '')} \u00b7 Baseline: ${price} \u00b7 ${escapeHtml(emailShort)}</div>
+                            <div class="tracked-meta">Departs ${escapeHtml(formattedDate)} \u00b7 ${escapeHtml(subscriberText)}</div>
                         </div>
-                        <button class="stop-btn" data-track-id="${escapeHtml(t.id)}">Stop Tracking</button>
+                        ${adminAction}
                     </div>`;
                 }).join('');
 
-                list.querySelectorAll('.stop-btn').forEach(btn => {
-                    btn.addEventListener('click', () => deleteTrack(btn.dataset.trackId));
+                list.querySelectorAll('.admin-route-btn').forEach(btn => {
+                    btn.addEventListener('click', () => openRouteAdminModal(
+                        btn.dataset.routeOrigin,
+                        btn.dataset.routeDestination,
+                        btn.dataset.routeDate,
+                        btn.dataset.routeTrackIds,
+                    ));
                 });
             } catch (e) {
                 // Firestore may be unavailable
             }
+        }
+
+        function formatTrackedDate(dateValue) {
+            if (!dateValue) return 'date unavailable';
+
+            const raw = String(dateValue).trim();
+            if (!raw) return 'date unavailable';
+
+            const normalized = raw.split('T', 1)[0].trim();
+            const parts = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (!parts) return normalized || raw;
+
+            const year = Number(parts[1]);
+            const monthIndex = Number(parts[2]) - 1;
+            const day = Number(parts[3]);
+            const date = new Date(year, monthIndex, day);
+            if (Number.isNaN(date.getTime())) return normalized;
+
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        }
+
+        function normalizeTrackedRoutes(rawTracks = []) {
+            const grouped = new Map();
+
+            rawTracks.forEach((track) => {
+                const origin = track.origin || '';
+                const destination = track.destination || '';
+                const departureDate = track.departure_date || '';
+                const key = `${origin}__${destination}__${departureDate}`;
+
+                if (!grouped.has(key)) {
+                    grouped.set(key, {
+                        origin,
+                        destination,
+                        departure_date: departureDate,
+                        subscriber_count: 0,
+                        track_ids: [],
+                        subscribers: [],
+                    });
+                }
+
+                const entry = grouped.get(key);
+                const explicitCount = Number(track.subscriber_count || 0);
+                if (explicitCount > 0) {
+                    entry.subscriber_count = Math.max(entry.subscriber_count, explicitCount);
+                } else {
+                    entry.subscriber_count += 1;
+                }
+
+                if (Array.isArray(track.track_ids)) {
+                    track.track_ids.forEach((trackId) => {
+                        if (trackId && !entry.track_ids.includes(trackId)) {
+                            entry.track_ids.push(trackId);
+                        }
+                    });
+                } else if (track.id && !entry.track_ids.includes(track.id)) {
+                    entry.track_ids.push(track.id);
+                }
+
+                if (Array.isArray(track.subscribers)) {
+                    track.subscribers.forEach((subscriber) => {
+                        if (subscriber?.id && !entry.subscribers.some((item) => item.id === subscriber.id)) {
+                            entry.subscribers.push(subscriber);
+                        }
+                    });
+                } else if (track.user_email || track.id) {
+                    entry.subscribers.push({
+                        id: track.id,
+                        user_email: track.user_email,
+                        latest_price: track.latest_price,
+                        adults: track.adults,
+                    });
+                }
+            });
+
+            return Array.from(grouped.values()).sort((a, b) => {
+                const aTime = new Date(`${a.departure_date || ''}T00:00:00`).getTime();
+                const bTime = new Date(`${b.departure_date || ''}T00:00:00`).getTime();
+                const safeATime = Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime;
+                const safeBTime = Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime;
+
+                if (safeATime !== safeBTime) return safeATime - safeBTime;
+                return `${a.origin || ''}${a.destination || ''}`.localeCompare(`${b.origin || ''}${b.destination || ''}`);
+            });
+        }
+
+        function updateTrackedAdminUi() {
+            const btn = document.getElementById('tracked-admin-btn');
+            if (trackedAdminMode) {
+                btn.textContent = 'Exit Subscription Manager';
+            } else {
+                btn.textContent = 'Manage Subscriptions';
+            }
+        }
+
+        async function toggleTrackedAdminMode() {
+            if (trackedAdminMode) {
+                trackedAdminToken = '';
+                trackedAdminMode = false;
+                sessionStorage.removeItem('flightwatchAdminToken');
+                updateTrackedAdminUi();
+                await loadTrackedFlights();
+                return;
+            }
+
+            openAdminAuthModal();
+        }
+
+        function openAdminAuthModal() {
+            document.getElementById('admin-auth-status').textContent = '';
+            document.getElementById('admin-password-input').value = '';
+            document.getElementById('admin-auth-overlay').classList.add('active');
+            setTimeout(() => document.getElementById('admin-password-input').focus(), 0);
+        }
+
+        function closeAdminAuthModal() {
+            document.getElementById('admin-auth-overlay').classList.remove('active');
+        }
+
+        async function submitAdminAuth() {
+            const input = document.getElementById('admin-password-input');
+            const token = input.value.trim();
+            if (!token) {
+                document.getElementById('admin-auth-status').textContent = 'Enter the admin password.';
+                document.getElementById('admin-auth-status').style.color = '#e74c3c';
+                return;
+            }
+
+            trackedAdminToken = token;
+            sessionStorage.setItem('flightwatchAdminToken', trackedAdminToken);
+            await loadTrackedFlights();
+            if (trackedAdminMode) {
+                closeAdminAuthModal();
+            } else {
+                sessionStorage.removeItem('flightwatchAdminToken');
+                trackedAdminToken = '';
+                document.getElementById('admin-auth-status').textContent = 'Admin sign-in failed.';
+                document.getElementById('admin-auth-status').style.color = '#e74c3c';
+            }
+        }
+
+        async function openRouteAdminModal(origin, destination, departureDate, trackIds = '') {
+            currentRouteAdminRoute = { origin, destination, departureDate, trackIds };
+            document.getElementById('route-admin-subtitle').textContent = `${origin} → ${destination} · Departs ${formatTrackedDate(departureDate)}`;
+            document.getElementById('route-admin-status').textContent = '';
+            document.getElementById('route-admin-overlay').classList.add('active');
+
+            const route = currentTrackedRoutes.find((item) =>
+                (item.origin || '') === origin &&
+                (item.destination || '') === destination &&
+                (item.departure_date || '') === departureDate
+            );
+            const subscribers = route?.subscribers || [];
+            const list = document.getElementById('route-admin-list');
+
+            if (subscribers.length === 0) {
+                list.innerHTML = '<div class="tracked-empty">No subscribers found for this route.</div>';
+                return;
+            }
+
+            list.innerHTML = subscribers.map((track) => {
+                const adults = Number(track.adults || 1);
+                return `
+                    <div class="subscriber-card">
+                        <div>
+                            <div class="subscriber-email">${escapeHtml(track.user_email || 'Unknown email')}</div>
+                            <div class="subscriber-meta">${adults} traveler${adults === 1 ? '' : 's'}</div>
+                        </div>
+                        <button class="stop-btn" type="button" data-track-id="${escapeHtml(track.id)}">Stop Tracking</button>
+                    </div>
+                `;
+            }).join('');
+
+            list.querySelectorAll('.stop-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    document.getElementById('route-admin-status').textContent = '';
+                    const deleted = await deleteTrack(btn.dataset.trackId);
+                    if (!deleted) return;
+
+                    currentTrackedRoutes = currentTrackedRoutes.map((item) => {
+                        if (
+                            (item.origin || '') === origin &&
+                            (item.destination || '') === destination &&
+                            (item.departure_date || '') === departureDate
+                        ) {
+                            return {
+                                ...item,
+                                subscriber_count: Math.max(0, Number(item.subscriber_count || 0) - 1),
+                                subscribers: (item.subscribers || []).filter((subscriber) => subscriber.id !== btn.dataset.trackId),
+                            };
+                        }
+                        return item;
+                    }).filter((item) => Number(item.subscriber_count || 0) > 0);
+
+                    document.getElementById('route-admin-status').textContent = 'Subscriber removed from this route.';
+                    document.getElementById('route-admin-status').style.color = '#27ae60';
+
+                    await loadTrackedFlights();
+                    const updatedRoute = currentTrackedRoutes.find((item) =>
+                        (item.origin || '') === origin &&
+                        (item.destination || '') === destination &&
+                        (item.departure_date || '') === departureDate
+                    );
+
+                    if (!updatedRoute || !updatedRoute.subscribers || updatedRoute.subscribers.length === 0) {
+                        closeRouteAdminModal();
+                        return;
+                    }
+
+                    await openRouteAdminModal(origin, destination, departureDate, trackIds);
+                });
+            });
+        }
+
+        function closeRouteAdminModal() {
+            document.getElementById('route-admin-overlay').classList.remove('active');
+            currentRouteAdminRoute = null;
         }
 
         // Tab switching
@@ -2053,11 +2513,29 @@
 
         async function deleteTrack(trackId) {
             try {
-                const resp = await fetch(`${API_BASE}/tracks/${trackId}`, { method: 'DELETE' });
-                if (!resp.ok) throw new Error('Delete failed');
-                loadTrackedFlights();
+                const resp = await fetch(`${API_BASE}/tracks/${trackId}`, {
+                    method: 'DELETE',
+                    headers: trackedAdminToken ? { 'X-Admin-Token': trackedAdminToken } : {},
+                });
+                if (resp.status === 401 && trackedAdminToken) {
+                    trackedAdminToken = '';
+                    trackedAdminMode = false;
+                    sessionStorage.removeItem('flightwatchAdminToken');
+                    updateTrackedAdminUi();
+                    throw new Error('Admin session expired. Please sign in again.');
+                }
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Delete failed');
+                }
+                return true;
             } catch (e) {
-                // Silently fail
+                const statusEl = document.getElementById('route-admin-status');
+                if (statusEl) {
+                    statusEl.textContent = e.message || 'Could not stop tracking.';
+                    statusEl.style.color = '#e74c3c';
+                }
+                return false;
             }
         }
 
@@ -2808,14 +3286,36 @@
         document.getElementById('budget-explorer-btn').addEventListener('click', openExplorer);
         document.getElementById('explorer-close-btn').addEventListener('click', closeExplorer);
         document.getElementById('explorer-show-all-btn').addEventListener('click', showAllDestinations);
+        document.getElementById('tracked-admin-btn').addEventListener('click', toggleTrackedAdminMode);
+        document.getElementById('admin-auth-cancel-btn').addEventListener('click', closeAdminAuthModal);
+        document.getElementById('admin-auth-submit-btn').addEventListener('click', submitAdminAuth);
+        document.getElementById('route-admin-close-btn').addEventListener('click', closeRouteAdminModal);
+
+        document.getElementById('admin-password-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') submitAdminAuth();
+        });
 
         document.getElementById('explorer-overlay').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) closeExplorer();
         });
 
+        document.getElementById('admin-auth-overlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeAdminAuthModal();
+        });
+
+        document.getElementById('route-admin-overlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeRouteAdminModal();
+        });
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && document.getElementById('explorer-overlay').classList.contains('active')) {
                 closeExplorer();
+            }
+            if (e.key === 'Escape' && document.getElementById('admin-auth-overlay').classList.contains('active')) {
+                closeAdminAuthModal();
+            }
+            if (e.key === 'Escape' && document.getElementById('route-admin-overlay').classList.contains('active')) {
+                closeRouteAdminModal();
             }
         });
 

@@ -166,6 +166,116 @@ def test_tracks_returns_503_when_firestore_is_unavailable(client, monkeypatch):
     assert response.json()["detail"] == "Firestore unavailable for test"
 
 
+def test_tracks_public_view_hides_emails(client, monkeypatch):
+    class FakeDoc:
+        def __init__(self, doc_id, payload):
+            self.id = doc_id
+            self._payload = payload
+
+        def to_dict(self):
+            return dict(self._payload)
+
+    fake_docs = [
+        FakeDoc("abc123", {
+            "origin": "JFK",
+            "destination": "LAX",
+            "departure_date": "2026-05-01",
+            "user_email": "hidden@example.com",
+        })
+    ]
+
+    monkeypatch.setattr(firestore_logic, "get_tracked_flights", lambda: fake_docs)
+    monkeypatch.setattr(app_simple_gcs, "get_tracked_flights", lambda: fake_docs)
+
+    response = client.get("/api/tracks")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["admin_view"] is False
+    assert data["count"] == 1
+    assert data["route_count"] == 1
+    assert "user_email" not in data["tracks"][0]
+    assert "id" not in data["tracks"][0]
+    assert data["tracks"][0]["origin"] == "JFK"
+    assert data["tracks"][0]["subscriber_count"] == 1
+
+
+def test_tracks_admin_view_returns_manageable_records(client, monkeypatch):
+    class FakeDoc:
+        def __init__(self, doc_id, payload):
+            self.id = doc_id
+            self._payload = payload
+
+        def to_dict(self):
+            return dict(self._payload)
+
+    fake_docs = [
+        FakeDoc("abc123", {
+            "origin": "JFK",
+            "destination": "LAX",
+            "departure_date": "2026-05-01",
+            "user_email": "hidden@example.com",
+        })
+    ]
+
+    monkeypatch.setenv("ADMIN_TOKEN", "secret-token")
+    monkeypatch.setattr(firestore_logic, "get_tracked_flights", lambda: fake_docs)
+    monkeypatch.setattr(app_simple_gcs, "get_tracked_flights", lambda: fake_docs)
+
+    response = client.get("/api/tracks", headers={"X-Admin-Token": "secret-token"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["admin_view"] is True
+    assert data["tracks"][0]["subscriber_count"] == 1
+    assert data["tracks"][0]["track_ids"] == ["abc123"]
+    assert data["tracks"][0]["subscribers"][0]["user_email"] == "hidden@example.com"
+
+
+def test_tracks_admin_details_returns_emails(client, monkeypatch):
+    class FakeDoc:
+        def __init__(self, doc_id, payload):
+            self.id = doc_id
+            self._payload = payload
+
+        def to_dict(self):
+            return dict(self._payload)
+
+    fake_docs = [
+        FakeDoc("abc123", {
+            "origin": "JFK",
+            "destination": "LAX",
+            "departure_date": "2026-05-01",
+            "user_email": "one@example.com",
+            "adults": 2,
+        }),
+        FakeDoc("def456", {
+            "origin": "JFK",
+            "destination": "LAX",
+            "departure_date": "2026-05-01",
+            "user_email": "two@example.com",
+            "adults": 1,
+        }),
+    ]
+
+    monkeypatch.setenv("ADMIN_TOKEN", "secret-token")
+    monkeypatch.setattr(firestore_logic, "get_tracked_flights", lambda: fake_docs)
+    monkeypatch.setattr(app_simple_gcs, "get_tracked_flights", lambda: fake_docs)
+
+    response = client.get(
+        "/api/tracks/details",
+        params={"origin": "JFK", "destination": "LAX", "departure_date": "2026-05-01"},
+        headers={"X-Admin-Token": "secret-token"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["count"] == 2
+    assert {track["user_email"] for track in data["tracks"]} == {"one@example.com", "two@example.com"}
+
+
+def test_delete_track_requires_admin_token(client):
+    response = client.delete("/api/tracks/some-id")
+    assert response.status_code == 401
+
+
 def test_normalize_date_text_accepts_slash_format():
     assert normalize_date_text("04/08/2026") == "2026-04-08"
     assert normalize_date_text("2026-04-08T09:00:00") == "2026-04-08"
