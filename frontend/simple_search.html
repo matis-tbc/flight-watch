@@ -212,6 +212,17 @@
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
+        #passengers {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            padding-right: 48px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath d='M3 5.25 7 9l4-3.75' fill='none' stroke='%23667eea' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            background-size: 14px 14px;
+        }
+
         .suggestions {
             position: absolute;
             top: 100%;
@@ -1102,18 +1113,24 @@
             position: absolute;
             top: 16px;
             right: 16px;
-            width: 36px;
-            height: 36px;
-            border-radius: 999px;
-            border: 1px solid #dfe3eb;
-            background: #ffffff;
+            width: auto;
+            height: auto;
+            border: none;
+            background: transparent;
             color: #667eea;
-            font-size: 20px;
             cursor: pointer;
-            display: grid;
-            place-items: center;
+            padding: 4px 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             transition: background-color 0.18s ease;
             z-index: 10;
+        }
+
+        .explorer-close-btn .close-glyph {
+            display: block;
+            font-size: 30px;
+            line-height: 1;
         }
 
         .explorer-close-btn:hover {
@@ -1402,7 +1419,7 @@
                         <div class="metric-sub" id="metric-current-sub">Lowest fare in current results</div>
                     </div>
                     <div class="metric-card">
-                        <div class="metric-label">Rough Target (Demo)</div>
+                        <div class="metric-label">Rough Target</div>
                         <div class="metric-value" id="metric-predicted">$0</div>
                         <div class="metric-sub" id="metric-predicted-sub">Estimated best future fare</div>
                     </div>
@@ -1510,7 +1527,9 @@
     <!-- Budget Explorer Modal -->
     <div class="explorer-overlay" id="explorer-overlay">
         <div class="explorer-modal">
-            <button class="explorer-close-btn" id="explorer-close-btn">&times;</button>
+            <button class="explorer-close-btn" id="explorer-close-btn" aria-label="Close budget explorer">
+                <span class="close-glyph" aria-hidden="true">&times;</span>
+            </button>
             <div class="explorer-title">Budget Explorer</div>
             <p class="explorer-subtitle">Find every destination you can reach within your budget</p>
 
@@ -2581,7 +2600,6 @@
                 const duration = formatDuration(flight.duration);
                 const aircraft = flight.aircraft || 'N/A';
                 const bookingLink = getBookingLink(flight);
-
                 let badgeClass = 'fair';
                 let badgeText = 'Fair fare';
 
