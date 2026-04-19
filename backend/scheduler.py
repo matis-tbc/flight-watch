@@ -66,6 +66,12 @@ def _safe_int(raw_value, default: int) -> int:
         return default
 
 
+def _scale_price_for_passengers(price: float | None, adults: int) -> float | None:
+    if price is None:
+        return None
+    return round(price * max(_safe_int(adults, 1), 1), 2)
+
+
 def _is_authorized_scheduler_request() -> bool:
     """Require a valid SCHEDULER_TOKEN header. Deny by default if no token is configured."""
     required_token = os.getenv("SCHEDULER_TOKEN", "").strip()
@@ -107,6 +113,9 @@ def extract_price(flight_record: dict) -> float | None:
         raw = raw.get("total")
 
     # Legacy flat field from GCS CSV rows
+    if raw is None:
+        raw = flight_record.get("total_price")
+
     if raw is None:
         raw = flight_record.get("flight_price")
 
@@ -162,6 +171,7 @@ def check_prices():
                 destination     = data.get("destination")
                 departure_date  = _normalize_departure_date(data.get("departure_date"))
                 user_email      = data.get("user_email")
+                adults          = _safe_int(data.get("adults", 1), 1)
                 previous_price  = extract_price({"price": data.get("latest_price")})
 
                 if not origin or not destination or not departure_date:
@@ -180,7 +190,7 @@ def check_prices():
                     summary["skipped_no_flights"] += 1
                     continue
 
-                latest_price = extract_price(flights[0])
+                latest_price = _scale_price_for_passengers(extract_price(flights[0]), adults)
                 if latest_price is None:
                     summary["skipped_invalid_price"] += 1
                     continue

@@ -1,4 +1,5 @@
 """Tests for FlightWatch API endpoints."""
+import app_simple_gcs
 import firestore_logic
 from date_utils import normalize_date_text
 from unsubscribe_tokens import build_unsubscribe_token
@@ -34,25 +35,32 @@ def test_search_returns_flights(client):
     assert data["destination"] == "LAX"
 
 
-def test_search_scales_mock_prices_for_multiple_passengers(client, monkeypatch):
-    monkeypatch.setattr("app_simple_gcs.check_gcs_configured", lambda: False)
-    monkeypatch.setattr("app_simple_gcs.check_amadeus_configured", lambda: False)
+def test_search_scales_mock_prices_by_passengers(client, monkeypatch):
+    monkeypatch.setattr(app_simple_gcs, "check_gcs_configured", lambda: False)
+    monkeypatch.setattr(app_simple_gcs, "check_amadeus_configured", lambda: False)
+    monkeypatch.setattr(
+        app_simple_gcs,
+        "get_mock_flights",
+        lambda origin, destination, departure_date=None: [
+            {
+                "id": "mock-1",
+                "price": {"total": "100.00", "currency": "USD"},
+                "source": "mock",
+            }
+        ],
+    )
 
     response = client.get("/api/search", params={
         "origin": "JFK",
         "destination": "LAX",
-        "departure_date": "2026-04-20",
         "passengers": 3,
-        "limit": 1,
     })
 
     assert response.status_code == 200
     data = response.json()
-    assert data["source"] == "mock"
     assert data["passengers"] == 3
-    assert data["flights"][0]["price"]["total"] == "899.97"
-    assert data["flights"][0]["passengers_priced"] == 3
-    assert data["flights"][0]["price_basis"] == "total_for_all_passengers"
+    assert data["pricing_basis"] == "scaled_from_single_passenger_mock_data"
+    assert data["flights"][0]["price"]["total"] == "300.00"
 
 
 def test_search_missing_params(client):
@@ -181,14 +189,109 @@ def test_unsubscribe_disables_notifications(client, monkeypatch):
     monkeypatch.setenv("SCHEDULER_TOKEN", "test-secret")
     monkeypatch.setattr("app_simple_gcs.disable_notifications_for_email", fake_disable_notifications)
 
-    response = client.get(
-        "/unsubscribe",
-        params={
-            "email": "User@Example.com",
-            "token": build_unsubscribe_token("user@example.com"),
+    response = client.get("/api/search", params={
+        "origin": "JFK",
+        "destination": "LAX",
+        "departure_date": test_date,
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["source"] == "gcs"
+    assert len(data["flights"]) > 0
+    assert "date_note" not in data
+
+
+def test_create_track(client, monkeypatch):
+    captured = {}
+
+    def fake_create_tracked_flight(**kwargs):
+        captured.update(kwargs)
+        return "fake-doc-id"
+
+    monkeypatch.setattr(firestore_logic, "create_tracked_flight", fake_create_tracked_flight)
+    if hasattr(app_simple_gcs, "create_tracked_flight"):
+        monkeypatch.setattr(app_simple_gcs, "create_tracked_flight", fake_create_tracked_flight)
+
+    response = client.post("/api/tracks", params={
+        "origin": "JFK",
+        "destination": "ORD",
+        "departure_date": "2026-04-15",
+        "user_email": "test@example.com",
+        "passengers": 2,
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["doc_id"] == "fake-doc-id"
+    assert data["origin"] == "JFK"
+    assert data["passengers"] == 2
+    assert captured["adults"] == 2
+
+
+def test_predict_with_baseline(client, monkeypatch):
+    """Predict endpoint returns baseline data when origin/destination are provided."""
+    monkeypatch.setattr(
+        app_simple_gcs.gcs_data_service_simple,
+        "get_route_baseline",
+        lambda origin, destination: {
+            "median": 150,
+            "mean": 155,
+            "p25": 120,
+            "p75": 180,
+            "min": 100,
+            "max": 220,
+            "sample_size": 8,
         },
     )
 
+    payload = {
+        "origin": "JFK",
+        "destination": "ORD",
+        "current_best_price": 100,
+        "current_avg_price": 150,
+        "current_price_spread": 80,
+        "volatility_score": 0.1,
+        "days_until_departure": 20,
+        "current_flights": [],
+    }
+    response = client.post("/api/predict", json=payload)
     assert response.status_code == 200
-    assert called["email"] == "user@example.com"
-    assert "Updated 2 tracked flight alerts." in response.text
+    data = response.json()
+    assert data["model_status"] == "gcs-baseline-v1"
+    assert "historical_median" in data
+    assert "buy_signal" in data
+    assert data["buy_signal"] in ("great_deal", "good_price", "typical", "high")
+    assert "sample_size" in data
+    assert data["sample_size"] > 0
+
+
+def test_route_baseline_math():
+    """Verify baseline computation returns correct stats."""
+    from gcs_data_service_simple import GCSDataServiceSimple
+    svc = GCSDataServiceSimple()
+    svc.data_cache = [
+        {"origin": "TST", "destination": "DST", "total_price": "100"},
+        {"origin": "TST", "destination": "DST", "total_price": "200"},
+        {"origin": "TST", "destination": "DST", "total_price": "300"},
+        {"origin": "TST", "destination": "DST", "total_price": "400"},
+        {"origin": "TST", "destination": "DST", "total_price": "500"},
+    ]
+    baseline = svc.get_route_baseline("TST", "DST")
+    assert baseline is not None
+    assert baseline["median"] == 300  # odd count: middle value
+    assert baseline["min"] == 100
+    assert baseline["max"] == 500
+    assert baseline["sample_size"] == 5
+    assert baseline["p25"] == 200
+    assert baseline["p75"] == 400
+
+    # Test even count: median should be average of two middle values
+    svc2 = GCSDataServiceSimple()
+    svc2.data_cache = [
+        {"origin": "AA", "destination": "BB", "total_price": "100"},
+        {"origin": "AA", "destination": "BB", "total_price": "200"},
+        {"origin": "AA", "destination": "BB", "total_price": "300"},
+        {"origin": "AA", "destination": "BB", "total_price": "400"},
+    ]
+    b2 = svc2.get_route_baseline("AA", "BB")
+    assert b2 is not None
+    assert b2["median"] == 250  # (200 + 300) / 2

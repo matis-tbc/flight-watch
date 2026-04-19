@@ -575,22 +575,6 @@
 
         .flight-card.has-booking-link {
             position: relative;
-            cursor: pointer;
-        }
-
-        .flight-card.has-booking-link::after {
-            content: '›';
-            position: absolute;
-            right: 18px;
-            top: 50%;
-            transform: translateY(-50%) translateX(-6px);
-            font-size: 42px;
-            line-height: 1;
-            font-weight: 300;
-            color: #667eea;
-            opacity: 0;
-            transition: opacity 0.18s ease, transform 0.18s ease;
-            pointer-events: none;
         }
 
         .flight-card.has-booking-link:hover {
@@ -598,20 +582,13 @@
             box-shadow: inset 0 0 0 1px #ececf3;
         }
 
-        .flight-card.has-booking-link:hover::after {
-            opacity: 1;
-            transform: translateY(-50%) translateX(0);
-        }
-
         .flight-card.has-booking-link .flight-header,
-        .flight-card.has-booking-link .flight-details,
-        .flight-card.has-booking-link .duration {
+        .flight-card.has-booking-link .flight-details {
             padding-right: 34px;
         }
 
-        .flight-card.has-booking-link:focus-visible {
-            outline: none;
-            box-shadow: inset 0 0 0 2px rgba(102, 126, 234, 0.28);
+        .flight-card.has-booking-link .duration {
+            padding-right: 0;
         }
 
         .flight-header {
@@ -651,10 +628,11 @@
         }
 
         .flight-footer {
-            display: flex;
-            justify-content: space-between;
+            display: grid;
+            grid-template-columns: minmax(145px, 0.9fr) minmax(0, 2.1fr);
             align-items: center;
             margin-top: 8px;
+            gap: 10px;
         }
 
         .track-btn {
@@ -668,6 +646,9 @@
             cursor: pointer;
             transition: all 0.15s ease;
             white-space: nowrap;
+            display: inline-block;
+            width: 100%;
+            text-align: center;
         }
 
         .track-btn:hover {
@@ -929,9 +910,51 @@
         }
 
         .duration {
-            text-align: center;
+            text-align: left;
             color: #888;
             font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: visible;
+            text-overflow: clip;
+            min-width: 155px;
+        }
+
+        .booking-caret {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%) translateX(-6px);
+            display: grid;
+            place-items: center;
+            width: 42px;
+            height: 42px;
+            border: none;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.92);
+            color: #667eea;
+            text-decoration: none;
+            font-size: 40px;
+            line-height: 0.8;
+            font-weight: 300;
+            padding-bottom: 8px;
+            opacity: 0;
+            box-shadow: 0 8px 18px rgba(102, 126, 234, 0.14);
+            transition: opacity 0.18s ease, transform 0.18s ease, background-color 0.18s ease;
+        }
+
+        .flight-card.has-booking-link:hover .booking-caret,
+        .booking-caret:focus-visible {
+            opacity: 1;
+            transform: translateY(-50%) translateX(0);
+        }
+
+        .booking-caret:hover {
+            background: #f7f8ff;
+        }
+
+        .booking-caret:focus-visible {
+            outline: 2px solid rgba(102, 126, 234, 0.3);
+            outline-offset: 2px;
         }
 
         .arrow {
@@ -1559,6 +1582,32 @@
 
         // Lightweight geocoding cache (IATA -> {lat, lon, name})
         const geoCache = new Map();
+        const airportCoordinateLookup = {
+            ATL: { lat: 33.6407, lon: -84.4277, name: 'Hartsfield-Jackson Atlanta International Airport' },
+            AUS: { lat: 30.1975, lon: -97.6664, name: 'Austin-Bergstrom International Airport' },
+            BOS: { lat: 42.3656, lon: -71.0096, name: 'Boston Logan International Airport' },
+            CDG: { lat: 49.0097, lon: 2.5479, name: 'Paris Charles de Gaulle Airport' },
+            CLT: { lat: 35.2144, lon: -80.9473, name: 'Charlotte Douglas International Airport' },
+            DEN: { lat: 39.8561, lon: -104.6737, name: 'Denver International Airport' },
+            DFW: { lat: 32.8998, lon: -97.0403, name: 'Dallas Fort Worth International Airport' },
+            DTW: { lat: 42.2162, lon: -83.3554, name: 'Detroit Metropolitan Airport' },
+            EWR: { lat: 40.6895, lon: -74.1745, name: 'Newark Liberty International Airport' },
+            FLL: { lat: 26.0742, lon: -80.1506, name: 'Fort Lauderdale-Hollywood International Airport' },
+            IAD: { lat: 38.9531, lon: -77.4565, name: 'Washington Dulles International Airport' },
+            IAH: { lat: 29.9902, lon: -95.3368, name: 'George Bush Intercontinental Airport' },
+            JFK: { lat: 40.6413, lon: -73.7781, name: 'John F. Kennedy International Airport' },
+            LAS: { lat: 36.0840, lon: -115.1537, name: 'Harry Reid International Airport' },
+            LAX: { lat: 33.9416, lon: -118.4085, name: 'Los Angeles International Airport' },
+            LHR: { lat: 51.4700, lon: -0.4543, name: 'London Heathrow Airport' },
+            MIA: { lat: 25.7959, lon: -80.2870, name: 'Miami International Airport' },
+            MSP: { lat: 44.8848, lon: -93.2223, name: 'Minneapolis-Saint Paul International Airport' },
+            ORD: { lat: 41.9742, lon: -87.9073, name: "Chicago O'Hare International Airport" },
+            PHL: { lat: 39.8744, lon: -75.2424, name: 'Philadelphia International Airport' },
+            PHX: { lat: 33.4342, lon: -112.0116, name: 'Phoenix Sky Harbor International Airport' },
+            SAN: { lat: 32.7338, lon: -117.1933, name: 'San Diego International Airport' },
+            SEA: { lat: 47.4502, lon: -122.3088, name: 'Seattle-Tacoma International Airport' },
+            SFO: { lat: 37.6213, lon: -122.3790, name: 'San Francisco International Airport' }
+        };
 
         const airlineBookingLinks = {
             AA: 'https://www.aa.com',
@@ -1655,6 +1704,12 @@
         async function geocodeAirport(iataCode) {
             const code = iataCode.toUpperCase();
             if (geoCache.has(code)) return geoCache.get(code);
+
+            if (airportCoordinateLookup[code]) {
+                const exact = { code, ...airportCoordinateLookup[code] };
+                geoCache.set(code, exact);
+                return exact;
+            }
 
             const q = encodeURIComponent(`${code} airport`);
             const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`;
@@ -1900,11 +1955,13 @@
             document.getElementById('track-status').textContent = '';
 
             try {
+                const passengers = document.getElementById('passengers').value || '1';
                 const params = new URLSearchParams({
                     origin: _trackOrigin,
                     destination: _trackDest,
                     departure_date: _trackDate,
                     user_email: email,
+                    passengers,
                 });
                 const resp = await fetch(`${API_BASE}/tracks?${params}`, { method: 'POST' });
                 if (!resp.ok) {
@@ -2521,8 +2578,8 @@
                 const destination = flight.destination || data.destination;
                 const departure = flight.departure_datetime || flight.departure;
                 const arrival = flight.arrival_datetime || flight.arrival;
-                const formattedDuration = formatDuration(flight.duration);
-                const aircraft = String(flight.aircraft || '').trim();
+                const duration = formatDuration(flight.duration);
+                const aircraft = flight.aircraft || 'N/A';
                 const bookingLink = getBookingLink(flight);
 
                 let badgeClass = 'fair';
@@ -2538,12 +2595,13 @@
 
                 const cardClasses = `flight-card${bookingLink ? ' has-booking-link' : ''}`;
                 const titleAttr = bookingLink ? 'title="Book now on airline website"' : '';
-                const clickAttrs = bookingLink
-                    ? `data-booking-link="${escapeHtml(bookingLink)}" tabindex="0" role="link"`
+                const bookingCaret = bookingLink
+                    ? `<a class="booking-caret" href="${escapeHtml(bookingLink)}" target="_blank" rel="noopener noreferrer" aria-label="Open airline website">›</a>`
                     : '';
 
                 return `
-                <div class="${cardClasses}" ${titleAttr} ${clickAttrs}>
+                <div class="${cardClasses}" ${titleAttr}>
+                    ${bookingCaret}
                     <div class="flight-header">
                         <div>
                             <div class="airline">${escapeHtml(airline)} ${escapeHtml(flightNum)}</div>
@@ -2564,28 +2622,22 @@
                             <div class="time">${escapeHtml(formatDateTime(arrival))}</div>
                         </div>
                     </div>
-                    <div class="duration">${escapeHtml(formattedDuration)}${aircraft ? ` • Aircraft: ${escapeHtml(aircraft)}` : ''}</div>
+                    <div class="flight-footer">
+                        <div class="duration">Duration: ${escapeHtml(duration)}</div>
+                        <button class="track-btn" data-track-origin="${escapeHtml(origin)}" data-track-dest="${escapeHtml(destination)}" data-track-date="${escapeHtml(data.departure_date || '')}" data-track-price="${priceValue || 0}">Track Price</button>
+                    </div>
                 </div>
                 `;
             }).join('');
 
-            container.querySelectorAll('.flight-card.has-booking-link').forEach(card => {
-                const bookingLink = card.dataset.bookingLink;
-                if (!bookingLink) return;
-
-                card.addEventListener('click', () => {
-                    window.open(bookingLink, '_blank', 'noopener,noreferrer');
-                });
-
-                card.addEventListener('keydown', (event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        window.open(bookingLink, '_blank', 'noopener,noreferrer');
-                    }
+            // Track button event delegation (avoids inline onclick XSS risk)
+            container.querySelectorAll('.track-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openTrackModal(btn.dataset.trackOrigin, btn.dataset.trackDest, btn.dataset.trackDate, Number(btn.dataset.trackPrice));
                 });
             });
 
-            updateTrackPanel(data);
             resultsEl.style.display = 'block';
         }
 
@@ -2615,24 +2667,40 @@
             });
         }
 
-        function formatDuration(durationStr) {
-            const raw = String(durationStr || '').trim();
-            if (!raw) return 'Duration unavailable';
+        function formatDuration(durationValue) {
+            if (!durationValue) return 'Duration unavailable';
 
-            const isoMatch = raw.match(/^PT(?:(\d+)H)?(?:(\d+)M)?$/i);
-            if (!isoMatch) {
-                return raw === 'N/A' ? 'Duration unavailable' : `Duration: ${raw}`;
+            const text = String(durationValue).trim();
+            if (!text) return 'Duration unavailable';
+
+            const isoMatch = text.match(/^PT(?:(\d+)H)?(?:(\d+)M)?$/i);
+            if (isoMatch) {
+                const hours = Number(isoMatch[1] || 0);
+                const minutes = Number(isoMatch[2] || 0);
+                if (hours && minutes) return `${hours}h ${minutes}m`;
+                if (hours) return `${hours}h`;
+                if (minutes) return `${minutes}m`;
             }
 
-            const hours = Number(isoMatch[1] || 0);
-            const minutes = Number(isoMatch[2] || 0);
-            const parts = [];
+            const hoursMatch = text.match(/(\d+)\s*(?:h|hr|hrs|hour|hours)\b/i);
+            const minutesMatch = text.match(/(\d+)\s*(?:m|min|mins|minute|minutes)\b/i);
+            if (hoursMatch || minutesMatch) {
+                const hours = hoursMatch ? Number(hoursMatch[1]) : 0;
+                const minutes = minutesMatch ? Number(minutesMatch[1]) : 0;
+                if (hours && minutes) return `${hours}h ${minutes}m`;
+                if (hours) return `${hours}h`;
+                if (minutes) return `${minutes}m`;
+            }
 
-            if (hours) parts.push(`${hours}h`);
-            if (minutes) parts.push(`${minutes}m`);
-            if (!parts.length) parts.push('0m');
+            const compactMatch = text.match(/^(\d+)\s*h(?:\s*(\d+)\s*m?)?$/i);
+            if (compactMatch) {
+                const hours = Number(compactMatch[1] || 0);
+                const minutes = Number(compactMatch[2] || 0);
+                if (hours && minutes) return `${hours}h ${minutes}m`;
+                if (hours) return `${hours}h`;
+            }
 
-            return `Duration: ${parts.join(' ')}`;
+            return text.replace(/\s+/g, ' ');
         }
 
         // ── Budget Explorer ──────────────────────────────────────────────
@@ -2889,7 +2957,6 @@
                             ${depTime ? `<div class="dest-detail-row"><span>Departs</span><span>${escapeHtml(depTime)}</span></div>` : ''}
                             ${arrTime ? `<div class="dest-detail-row"><span>Arrives</span><span>${escapeHtml(arrTime)}</span></div>` : ''}
                             ${duration ? `<div class="dest-detail-row"><span>Duration</span><span>${escapeHtml(duration)}</span></div>` : ''}
-                            ${aircraft ? `<div class="dest-detail-row"><span>Aircraft</span><span>${escapeHtml(aircraft)}</span></div>` : ''}
                             <button class="dest-search-btn" data-origin="${escapeHtml(data.origin)}" data-dest="${escapeHtml(dest.destination)}">Search this route</button>
                         </div>
                     </div>

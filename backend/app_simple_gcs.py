@@ -136,46 +136,44 @@ def check_gcs_configured() -> bool:
     return GCS_AVAILABLE and gcs_data_service_simple.is_configured()
 
 
-def _format_scaled_price(value: float) -> str:
-    return f"{value:.2f}"
+def _normalize_passenger_count(passengers: int) -> int:
+    try:
+        return max(int(passengers), 1)
+    except (TypeError, ValueError):
+        return 1
 
 
-def _scale_flights_for_passengers(flights: List[Dict[str, Any]], passengers: int) -> List[Dict[str, Any]]:
-    """
-    GCS and mock flight data are stored as a single-traveler fare.
-    Scale the displayed total so the UI reflects the selected traveler count.
-    """
-    safe_passengers = max(1, int(passengers or 1))
-    if safe_passengers == 1:
+def _scale_price_value(raw_value: Any, passengers: int) -> Any:
+    if raw_value is None:
+        return None
+    try:
+        scaled = float(str(raw_value).replace(",", "").strip()) * passengers
+    except (TypeError, ValueError):
+        return raw_value
+    return f"{scaled:.2f}"
+
+
+def _scale_flight_prices(flights: List[Dict[str, Any]], passengers: int) -> List[Dict[str, Any]]:
+    passenger_count = _normalize_passenger_count(passengers)
+    if passenger_count == 1:
         return flights
 
-    scaled_flights = []
+    scaled_flights: List[Dict[str, Any]] = []
     for flight in flights:
-        scaled = copy.deepcopy(flight)
+        scaled = dict(flight)
 
-        if "total_price" in scaled:
-            try:
-                base_total = float(str(scaled["total_price"]).replace(",", "").strip())
-                scaled["total_price"] = _format_scaled_price(base_total * safe_passengers)
-            except (TypeError, ValueError):
-                pass
+        if isinstance(flight.get("price"), dict):
+            scaled_price = dict(flight["price"])
+            scaled_total = _scale_price_value(scaled_price.get("total"), passenger_count)
+            if scaled_total is not None:
+                scaled_price["total"] = scaled_total
+            scaled["price"] = scaled_price
 
-        price_value = scaled.get("price")
-        if isinstance(price_value, dict) and "total" in price_value:
-            try:
-                base_total = float(str(price_value["total"]).replace(",", "").strip())
-                scaled["price"]["total"] = _format_scaled_price(base_total * safe_passengers)
-            except (TypeError, ValueError):
-                pass
-        elif isinstance(price_value, (int, float, str)):
-            try:
-                base_total = float(str(price_value).replace(",", "").strip())
-                scaled["price"] = _format_scaled_price(base_total * safe_passengers)
-            except (TypeError, ValueError):
-                pass
+        for field_name in ("total_price", "flight_price"):
+            if field_name in flight:
+                scaled[field_name] = _scale_price_value(flight.get(field_name), passenger_count)
 
-        scaled["price_basis"] = "total_for_all_passengers"
-        scaled["passengers_priced"] = safe_passengers
+        scaled["passengers"] = passenger_count
         scaled_flights.append(scaled)
 
     return scaled_flights
@@ -353,6 +351,7 @@ async def search_flights(
     limit: int = 50
 ):
     """search flights - gcs first, then amadeus, then mock"""
+    passengers = _normalize_passenger_count(passengers)
     actual_departure_date = normalize_date_text(departure_date)
     normalized_return_date = normalize_date_text(return_date)
     if not actual_departure_date:
@@ -369,18 +368,29 @@ async def search_flights(
             )
             
             if flights:
-                return {
+                scaled_flights = _scale_flight_prices(flights, passengers)
+                # Detect if date fallback was used (flights don't match requested date)
+                date_note = None
+                first_dt = gcs_data_service_simple._get_field(flights[0], 'departure_datetime', 'departure_date', 'date', 'departure')[:10] if flights else ""
+                if first_dt and not first_dt.startswith(actual_departure_date):
+                    dr = gcs_data_service_simple.get_date_range()
+                    range_str = f"{dr['earliest_date']} to {dr['latest_date']}" if dr else "available dates"
+                    date_note = f"Showing closest available flights (data covers {range_str})"
+
+                result = {
                     "origin": origin,
                     "destination": destination,
                     "departure_date": actual_departure_date,
                     "return_date": normalized_return_date,
                     "passengers": passengers,
-                    "flights": priced_flights,
+                    "flights": scaled_flights[:limit],
                     "source": "gcs",
                     "count": len(flights),
                     "status": "success: gcs flight data",
                     "note": f"found {len(flights)} flights from gcs"
                 }
+                if passengers > 1:
+                    result["pricing_basis"] = "scaled_from_single_passenger_dataset"
                 if date_note:
                     result["date_note"] = date_note
                 return result
@@ -427,13 +437,11 @@ async def search_flights(
         "departure_date": actual_departure_date,
         "return_date": normalized_return_date,
         "passengers": passengers,
-        "flights": _scale_flights_for_passengers(
-            get_mock_flights(origin, destination, actual_departure_date)[:limit],
-            passengers,
-        ),
+        "flights": _scale_flight_prices(get_mock_flights(origin, destination, actual_departure_date), passengers)[:limit],
         "source": "mock",
         "status": "WARNING: Using mock data",
-        "note": "⚠️ Configure GCS or Amadeus for real flight data"
+        "note": "⚠️ Configure GCS or Amadeus for real flight data",
+        "pricing_basis": "scaled_from_single_passenger_mock_data" if passengers > 1 else "single_passenger_mock_data"
     }
 
 @app.get("/api/explore")
@@ -482,6 +490,7 @@ async def create_track(
     destination: str,
     departure_date: str,
     user_email: str,                      # required — scheduler needs this to send emails
+    passengers: int = 1,
     return_date: Optional[str] = None,
     max_price: Optional[float] = None,
 ):
@@ -497,6 +506,7 @@ async def create_track(
     normalized_return_date = normalize_date_text(return_date)
     if not normalized_departure_date:
         raise HTTPException(status_code=400, detail="departure_date is required.")
+    passengers = _normalize_passenger_count(passengers)
 
     # Fetch current price from GCS to use as the baseline for future comparisons
     flights = gcs_data_service_simple.search_flights(
@@ -511,8 +521,10 @@ async def create_track(
         raw = flights[0].get("price")
         if isinstance(raw, dict):
             raw = raw.get("total")
+        if raw is None:
+            raw = flights[0].get("total_price") or flights[0].get("flight_price")
         try:
-            latest_price = float(str(raw).replace(",", "").strip()) if raw else None
+            latest_price = float(str(raw).replace(",", "").strip()) * passengers if raw else None
         except (TypeError, ValueError):
             latest_price = None
 
@@ -522,6 +534,7 @@ async def create_track(
         destination=destination,
         departure_date=normalized_departure_date,
         latest_price=latest_price,
+        adults=passengers,
         return_date=normalized_return_date,
     )
 
@@ -533,6 +546,7 @@ async def create_track(
         "destination": destination.upper(),
         "departure_date": normalized_departure_date,
         "return_date": normalized_return_date,
+        "passengers": passengers,
         "baseline_price": latest_price,
     }
 
