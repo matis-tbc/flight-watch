@@ -89,7 +89,7 @@ The script will:
 To create the admin password secret in Secret Manager:
 
 ```bash
-echo -n "flightwatchers!" | gcloud secrets create "admin-token" \
+echo -n "password_here" | gcloud secrets create "admin-token" \
   --project="$PROJECT_ID" \
   --data-file=-
 ```
@@ -97,7 +97,7 @@ echo -n "flightwatchers!" | gcloud secrets create "admin-token" \
 If the secret already exists, add a new version instead:
 
 ```bash
-echo -n "flightwatchers!" | gcloud secrets versions add "admin-token" \
+echo -n "password_here" | gcloud secrets versions add "admin-token" \
   --project="$PROJECT_ID" \
   --data-file=-
 ```
