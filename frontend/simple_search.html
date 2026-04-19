@@ -1111,6 +1111,16 @@
             overflow: visible;
             text-overflow: clip;
             min-width: 155px;
+            line-height: 1.45;
+        }
+
+        .duration-aircraft {
+            display: block;
+            margin-top: 2px;
+            color: #9aa0ab;
+            font-size: 0.82rem;
+            font-weight: 400;
+            white-space: normal;
         }
 
         .booking-caret {
@@ -3077,6 +3087,8 @@
                 const arrival = flight.arrival_datetime || flight.arrival;
                 const duration = formatDuration(flight.duration);
                 const aircraft = flight.aircraft || 'N/A';
+                const headerAircraftText = `${airline} ${flightNum}`.trim() || 'N/A';
+                const aircraftDisplay = aircraft && aircraft !== 'N/A' ? aircraft : headerAircraftText;
                 const bookingLink = getBookingLink(flight);
                 let badgeClass = 'fair';
                 let badgeText = 'Fair fare';
@@ -3100,7 +3112,6 @@
                     ${bookingCaret}
                     <div class="flight-header">
                         <div>
-                            <div class="airline">${escapeHtml(airline)} ${escapeHtml(flightNum)}</div>
                             <div class="flight-badge-row">
                                 <span class="small-badge ${badgeClass}">${escapeHtml(badgeText)}</span>
                             </div>
@@ -3119,7 +3130,7 @@
                         </div>
                     </div>
                     <div class="flight-footer">
-                        <div class="duration">Duration: ${escapeHtml(duration)}</div>
+                        <div class="duration">Duration: ${escapeHtml(duration)}<span class="duration-aircraft">Aircraft: ${escapeHtml(aircraftDisplay)}</span></div>
                         <button class="track-btn" data-track-origin="${escapeHtml(origin)}" data-track-dest="${escapeHtml(destination)}" data-track-date="${escapeHtml(data.departure_date || '')}" data-track-price="${priceValue || 0}">Track Price</button>
                     </div>
                 </div>
