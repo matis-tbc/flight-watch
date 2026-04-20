@@ -66,6 +66,7 @@ def create_tracked_flight(
     destination: str,
     departure_date: str,
     latest_price: float,
+    adults: int = 1,
     return_date: str = None,
 ):
     """
@@ -90,6 +91,7 @@ def create_tracked_flight(
         "destination": destination.strip().upper(),
         "departure_date": departure_date,
         "return_date": return_date,
+        "adults": max(int(adults or 1), 1),
         "latest_price": latest_price,
         "previous_price": None,
         "last_checked": None,

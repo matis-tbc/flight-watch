@@ -26,7 +26,7 @@ Before deploying, create or confirm:
 - A Cloud Run service account with access to:
   `Storage Object Viewer`, `Storage Object Admin` if ingest uploads raw payloads, and Firestore access for tracked flights/history
 - Secret Manager secrets for:
-  `AMADEUS_CLIENT_ID`, `AMADEUS_CLIENT_SECRET`, `SENDGRID_API_KEY`, `SCHEDULER_TOKEN`
+  `AMADEUS_CLIENT_ID`, `AMADEUS_CLIENT_SECRET`, `SENDGRID_API_KEY`, `SCHEDULER_TOKEN`, `ADMIN_TOKEN`
 
 ### Required environment values
 
@@ -50,6 +50,7 @@ Secret names:
 - `AMADEUS_CLIENT_SECRET_SECRET`
 - `SENDGRID_API_KEY_SECRET`
 - `SCHEDULER_TOKEN_SECRET`
+- `ADMIN_TOKEN_SECRET`
 
 ### Deploy
 
@@ -73,6 +74,7 @@ export AMADEUS_CLIENT_ID_SECRET="amadeus-client-id"
 export AMADEUS_CLIENT_SECRET_SECRET="amadeus-client-secret"
 export SENDGRID_API_KEY_SECRET="sendgrid-api-key"
 export SCHEDULER_TOKEN_SECRET="scheduler-token"
+export ADMIN_TOKEN_SECRET="admin-token"
 
 bash infra/deploy_cloud_run.sh
 ```
@@ -83,6 +85,22 @@ The script will:
 2. Deploy the API service with `SERVICE_MODE=api`
 3. Deploy the scheduler service with `SERVICE_MODE=scheduler`
 4. Print both Cloud Run URLs
+
+To create the admin password secret in Secret Manager:
+
+```bash
+echo -n "password_here" | gcloud secrets create "admin-token" \
+  --project="$PROJECT_ID" \
+  --data-file=-
+```
+
+If the secret already exists, add a new version instead:
+
+```bash
+echo -n "password_here" | gcloud secrets versions add "admin-token" \
+  --project="$PROJECT_ID" \
+  --data-file=-
+```
 
 ### Cloud Scheduler jobs
 

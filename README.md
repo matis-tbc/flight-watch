@@ -49,7 +49,7 @@ Lanes
    cd backend
    cp .env.example .env
    ```
-4. **Update `.env`**: Make sure `GCS_BUCKET` and `GCS_FILE_PATH` are set correctly.
+4. **Update `.env`**: Make sure `GCS_BUCKET` and `GCS_FILE_PATH` are set correctly. If you want to use the tracked-flights admin controls, also set `ADMIN_TOKEN`.
 5. **Run the backend**:
    ```bash
    python3 -m venv venv

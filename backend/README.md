@@ -74,6 +74,7 @@ INGEST_RAW_PREFIX=raw
 INGEST_MAX_OFFERS=20
 INGEST_MAX_RETRIES=3
 SCHEDULER_TOKEN=...
+ADMIN_TOKEN=...              # password used to unlock admin controls for tracked flights
 SENDGRID_API_KEY=SG.xxxxxxxxx # from SendGrid dashboard → API Keys
 FROM_EMAIL=you@example.com    # must be verified in SendGrid
 APP_BASE_URL=https://yourapp.com

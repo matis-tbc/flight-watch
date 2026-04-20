@@ -212,6 +212,17 @@
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
+        #passengers {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            padding-right: 48px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath d='M3 5.25 7 9l4-3.75' fill='none' stroke='%23667eea' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            background-size: 14px 14px;
+        }
+
         .suggestions {
             position: absolute;
             top: 100%;
@@ -575,22 +586,6 @@
 
         .flight-card.has-booking-link {
             position: relative;
-            cursor: pointer;
-        }
-
-        .flight-card.has-booking-link::after {
-            content: '›';
-            position: absolute;
-            right: 18px;
-            top: 50%;
-            transform: translateY(-50%) translateX(-6px);
-            font-size: 42px;
-            line-height: 1;
-            font-weight: 300;
-            color: #667eea;
-            opacity: 0;
-            transition: opacity 0.18s ease, transform 0.18s ease;
-            pointer-events: none;
         }
 
         .flight-card.has-booking-link:hover {
@@ -598,20 +593,13 @@
             box-shadow: inset 0 0 0 1px #ececf3;
         }
 
-        .flight-card.has-booking-link:hover::after {
-            opacity: 1;
-            transform: translateY(-50%) translateX(0);
-        }
-
         .flight-card.has-booking-link .flight-header,
-        .flight-card.has-booking-link .flight-details,
-        .flight-card.has-booking-link .duration {
+        .flight-card.has-booking-link .flight-details {
             padding-right: 34px;
         }
 
-        .flight-card.has-booking-link:focus-visible {
-            outline: none;
-            box-shadow: inset 0 0 0 2px rgba(102, 126, 234, 0.28);
+        .flight-card.has-booking-link .duration {
+            padding-right: 0;
         }
 
         .flight-header {
@@ -651,10 +639,11 @@
         }
 
         .flight-footer {
-            display: flex;
-            justify-content: space-between;
+            display: grid;
+            grid-template-columns: minmax(145px, 0.9fr) minmax(0, 2.1fr);
             align-items: center;
             margin-top: 8px;
+            gap: 10px;
         }
 
         .track-btn {
@@ -668,6 +657,9 @@
             cursor: pointer;
             transition: all 0.15s ease;
             white-space: nowrap;
+            display: inline-block;
+            width: 100%;
+            text-align: center;
         }
 
         .track-btn:hover {
@@ -836,10 +828,193 @@
             color: #fff;
         }
 
+        .subscriber-card .stop-btn {
+            width: auto;
+            background: none;
+            border: 1.5px solid #e74c3c;
+            color: #e74c3c;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .subscriber-card .stop-btn:hover {
+            background: #e74c3c;
+            color: #fff;
+        }
+
         .tracked-empty {
             color: #999;
             font-size: 14px;
             padding: 12px 0;
+        }
+
+        .tracked-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .tracked-summary {
+            color: #555;
+        }
+
+        .tracked-summary strong {
+            color: #222;
+        }
+
+        .tracked-admin-actions {
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .admin-btn {
+            width: auto;
+            padding: 8px 14px;
+            border-radius: 999px;
+            border: 1.5px solid #cfd6f6;
+            background: #fff;
+            color: #4453b3;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .admin-btn:hover {
+            background: #f7f8ff;
+        }
+
+        .admin-route-btn {
+            width: auto;
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1.5px solid #cfd6f6;
+            background: #fff;
+            color: #4453b3;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .admin-route-btn:hover {
+            background: #f7f8ff;
+        }
+
+        .admin-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            z-index: 2100;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .admin-overlay.active {
+            display: flex;
+        }
+
+        .admin-modal {
+            background: #fff;
+            border-radius: 16px;
+            padding: 28px;
+            width: min(460px, 100%);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+
+        .admin-modal h3 {
+            margin: 0 0 8px;
+            font-size: 20px;
+        }
+
+        .admin-modal-subtitle {
+            color: #667085;
+            margin-bottom: 18px;
+            line-height: 1.5;
+        }
+
+        .admin-modal input[type="password"] {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1.5px solid #d0d7e2;
+            border-radius: 10px;
+            font-size: 15px;
+            margin-bottom: 14px;
+        }
+
+        .admin-modal input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .admin-modal-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .admin-modal-actions button {
+            flex: 1;
+            border: none;
+            border-radius: 10px;
+            padding: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .admin-modal-cancel {
+            background: #f3f4f6;
+            color: #555;
+        }
+
+        .admin-modal-submit {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+        }
+
+        .admin-modal-status {
+            min-height: 20px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        .subscriber-list {
+            display: grid;
+            gap: 10px;
+            max-height: 360px;
+            overflow-y: auto;
+            margin-top: 16px;
+        }
+
+        .subscriber-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border: 1px solid #e8ebf4;
+            border-radius: 12px;
+            background: #fafbff;
+        }
+
+        .subscriber-email {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .subscriber-meta {
+            color: #777;
+            font-size: 13px;
+            margin-top: 4px;
         }
 
         .flight-actions {
@@ -929,9 +1104,61 @@
         }
 
         .duration {
-            text-align: center;
+            text-align: left;
             color: #888;
             font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: visible;
+            text-overflow: clip;
+            min-width: 155px;
+            line-height: 1.45;
+        }
+
+        .duration-aircraft {
+            display: block;
+            margin-top: 2px;
+            color: #9aa0ab;
+            font-size: 0.82rem;
+            font-weight: 400;
+            white-space: normal;
+        }
+
+        .booking-caret {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%) translateX(-6px);
+            display: grid;
+            place-items: center;
+            width: 42px;
+            height: 42px;
+            border: none;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.92);
+            color: #667eea;
+            text-decoration: none;
+            font-size: 40px;
+            line-height: 0.8;
+            font-weight: 300;
+            padding-bottom: 8px;
+            opacity: 0;
+            box-shadow: 0 8px 18px rgba(102, 126, 234, 0.14);
+            transition: opacity 0.18s ease, transform 0.18s ease, background-color 0.18s ease;
+        }
+
+        .flight-card.has-booking-link:hover .booking-caret,
+        .booking-caret:focus-visible {
+            opacity: 1;
+            transform: translateY(-50%) translateX(0);
+        }
+
+        .booking-caret:hover {
+            background: #f7f8ff;
+        }
+
+        .booking-caret:focus-visible {
+            outline: 2px solid rgba(102, 126, 234, 0.3);
+            outline-offset: 2px;
         }
 
         .arrow {
@@ -1079,18 +1306,24 @@
             position: absolute;
             top: 16px;
             right: 16px;
-            width: 36px;
-            height: 36px;
-            border-radius: 999px;
-            border: 1px solid #dfe3eb;
-            background: #ffffff;
+            width: auto;
+            height: auto;
+            border: none;
+            background: transparent;
             color: #667eea;
-            font-size: 20px;
             cursor: pointer;
-            display: grid;
-            place-items: center;
+            padding: 4px 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             transition: background-color 0.18s ease;
             z-index: 10;
+        }
+
+        .explorer-close-btn .close-glyph {
+            display: block;
+            font-size: 30px;
+            line-height: 1;
         }
 
         .explorer-close-btn:hover {
@@ -1379,7 +1612,7 @@
                         <div class="metric-sub" id="metric-current-sub">Lowest fare in current results</div>
                     </div>
                     <div class="metric-card">
-                        <div class="metric-label">Rough Target (Demo)</div>
+                        <div class="metric-label">Rough Target</div>
                         <div class="metric-value" id="metric-predicted">$0</div>
                         <div class="metric-sub" id="metric-predicted-sub">Estimated best future fare</div>
                     </div>
@@ -1460,6 +1693,12 @@
 
         <!-- Tracked flights tab content -->
         <div class="tab-panel" id="panel-tracked">
+            <div class="tracked-toolbar">
+                <div class="tracked-summary" id="tracked-summary"><strong>0 flights</strong> currently being tracked</div>
+                <div class="tracked-admin-actions">
+                    <button class="admin-btn" id="tracked-admin-btn" type="button">Manage Subscriptions</button>
+                </div>
+            </div>
             <div class="tracked-empty-state" id="tracked-empty" style="text-align:center;padding:48px 20px;color:#999;">
                 <div style="font-size:48px;margin-bottom:12px;">&#9992;</div>
                 <div style="font-size:16px;font-weight:500;">No flights being tracked yet</div>
@@ -1475,19 +1714,46 @@
         <div class="track-modal">
             <h3>Track Price Drops</h3>
             <div class="track-route" id="track-route-display"></div>
-            <input type="email" id="track-email" placeholder="Your email for alerts">
+            <input type="email" id="track-modal-email" placeholder="Your email for alerts">
             <div class="track-modal-actions">
                 <button class="track-cancel-btn" onclick="closeTrackModal()">Cancel</button>
                 <button class="track-submit-btn" id="track-submit-btn" onclick="submitTrack()">Start Tracking</button>
             </div>
-            <div class="track-status" id="track-status"></div>
+            <div class="track-status" id="track-modal-status"></div>
+        </div>
+    </div>
+
+    <div class="admin-overlay" id="admin-auth-overlay">
+        <div class="admin-modal">
+            <h3>Admin Sign-In</h3>
+            <div class="admin-modal-subtitle">Enter the admin password to unlock tracked-flight management.</div>
+            <input type="password" id="admin-password-input" placeholder="Admin password">
+            <div class="admin-modal-actions">
+                <button class="admin-modal-cancel" id="admin-auth-cancel-btn" type="button">Cancel</button>
+                <button class="admin-modal-submit" id="admin-auth-submit-btn" type="button">Sign In</button>
+            </div>
+            <div class="admin-modal-status" id="admin-auth-status"></div>
+        </div>
+    </div>
+
+    <div class="admin-overlay" id="route-admin-overlay">
+        <div class="admin-modal">
+            <h3>Tracked Subscribers</h3>
+            <div class="admin-modal-subtitle" id="route-admin-subtitle">Route details</div>
+            <div class="subscriber-list" id="route-admin-list"></div>
+            <div class="admin-modal-actions" style="margin-top:16px;">
+                <button class="admin-modal-cancel" id="route-admin-close-btn" type="button">Close</button>
+            </div>
+            <div class="admin-modal-status" id="route-admin-status"></div>
         </div>
     </div>
 
     <!-- Budget Explorer Modal -->
     <div class="explorer-overlay" id="explorer-overlay">
         <div class="explorer-modal">
-            <button class="explorer-close-btn" id="explorer-close-btn">&times;</button>
+            <button class="explorer-close-btn" id="explorer-close-btn" aria-label="Close budget explorer">
+                <span class="close-glyph" aria-hidden="true">&times;</span>
+            </button>
             <div class="explorer-title">Budget Explorer</div>
             <p class="explorer-subtitle">Find every destination you can reach within your budget</p>
 
@@ -1547,7 +1813,6 @@
         const API_BASE = window.location.protocol === 'file:'
             ? 'http://localhost:8000/api'
             : '/api';
-        const TRACKING_EMAIL_STORAGE_KEY = 'flightwatch_tracking_email';
         let allAirports = [];
         let latestSearchData = null;
 
@@ -1559,6 +1824,32 @@
 
         // Lightweight geocoding cache (IATA -> {lat, lon, name})
         const geoCache = new Map();
+        const airportCoordinateLookup = {
+            ATL: { lat: 33.6407, lon: -84.4277, name: 'Hartsfield-Jackson Atlanta International Airport' },
+            AUS: { lat: 30.1975, lon: -97.6664, name: 'Austin-Bergstrom International Airport' },
+            BOS: { lat: 42.3656, lon: -71.0096, name: 'Boston Logan International Airport' },
+            CDG: { lat: 49.0097, lon: 2.5479, name: 'Paris Charles de Gaulle Airport' },
+            CLT: { lat: 35.2144, lon: -80.9473, name: 'Charlotte Douglas International Airport' },
+            DEN: { lat: 39.8561, lon: -104.6737, name: 'Denver International Airport' },
+            DFW: { lat: 32.8998, lon: -97.0403, name: 'Dallas Fort Worth International Airport' },
+            DTW: { lat: 42.2162, lon: -83.3554, name: 'Detroit Metropolitan Airport' },
+            EWR: { lat: 40.6895, lon: -74.1745, name: 'Newark Liberty International Airport' },
+            FLL: { lat: 26.0742, lon: -80.1506, name: 'Fort Lauderdale-Hollywood International Airport' },
+            IAD: { lat: 38.9531, lon: -77.4565, name: 'Washington Dulles International Airport' },
+            IAH: { lat: 29.9902, lon: -95.3368, name: 'George Bush Intercontinental Airport' },
+            JFK: { lat: 40.6413, lon: -73.7781, name: 'John F. Kennedy International Airport' },
+            LAS: { lat: 36.0840, lon: -115.1537, name: 'Harry Reid International Airport' },
+            LAX: { lat: 33.9416, lon: -118.4085, name: 'Los Angeles International Airport' },
+            LHR: { lat: 51.4700, lon: -0.4543, name: 'London Heathrow Airport' },
+            MIA: { lat: 25.7959, lon: -80.2870, name: 'Miami International Airport' },
+            MSP: { lat: 44.8848, lon: -93.2223, name: 'Minneapolis-Saint Paul International Airport' },
+            ORD: { lat: 41.9742, lon: -87.9073, name: "Chicago O'Hare International Airport" },
+            PHL: { lat: 39.8744, lon: -75.2424, name: 'Philadelphia International Airport' },
+            PHX: { lat: 33.4342, lon: -112.0116, name: 'Phoenix Sky Harbor International Airport' },
+            SAN: { lat: 32.7338, lon: -117.1933, name: 'San Diego International Airport' },
+            SEA: { lat: 47.4502, lon: -122.3088, name: 'Seattle-Tacoma International Airport' },
+            SFO: { lat: 37.6213, lon: -122.3790, name: 'San Francisco International Airport' }
+        };
 
         const airlineBookingLinks = {
             AA: 'https://www.aa.com',
@@ -1655,6 +1946,12 @@
         async function geocodeAirport(iataCode) {
             const code = iataCode.toUpperCase();
             if (geoCache.has(code)) return geoCache.get(code);
+
+            if (airportCoordinateLookup[code]) {
+                const exact = { code, ...airportCoordinateLookup[code] };
+                geoCache.set(code, exact);
+                return exact;
+            }
 
             const q = encodeURIComponent(`${code} airport`);
             const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`;
@@ -1870,6 +2167,10 @@
         });
 
         // --- Flight Tracking ---
+        let trackedAdminToken = '';
+        let trackedAdminMode = false;
+        let currentTrackedRoutes = [];
+        let currentRouteAdminRoute = null;
         let _trackOrigin = '', _trackDest = '', _trackDate = '', _trackPrice = 0;
 
         function openTrackModal(origin, destination, date, price) {
@@ -1878,8 +2179,9 @@
             _trackDate = date;
             _trackPrice = price;
             document.getElementById('track-route-display').textContent = `${origin} \u2192 ${destination} \u00b7 ${date}`;
-            document.getElementById('track-status').textContent = '';
-            document.getElementById('track-email').value = '';
+            document.getElementById('track-modal-status').textContent = '';
+            const modalEmailInput = document.getElementById('track-modal-email');
+            modalEmailInput.value = '';
             document.getElementById('track-overlay').classList.add('active');
         }
 
@@ -1888,35 +2190,38 @@
         }
 
         async function submitTrack() {
-            const email = document.getElementById('track-email').value.trim();
+            const email = document.getElementById('track-modal-email').value.trim().toLowerCase();
+            const modalStatusEl = document.getElementById('track-modal-status');
             if (!email || !email.includes('@')) {
-                document.getElementById('track-status').textContent = 'Please enter a valid email.';
-                document.getElementById('track-status').style.color = '#e74c3c';
+                modalStatusEl.textContent = 'Please enter a valid email.';
+                modalStatusEl.style.color = '#e74c3c';
                 return;
             }
             const btn = document.getElementById('track-submit-btn');
             btn.disabled = true;
             btn.textContent = 'Saving...';
-            document.getElementById('track-status').textContent = '';
+            modalStatusEl.textContent = '';
 
             try {
+                const passengers = document.getElementById('passengers').value || '1';
                 const params = new URLSearchParams({
                     origin: _trackOrigin,
                     destination: _trackDest,
                     departure_date: _trackDate,
                     user_email: email,
+                    passengers,
                 });
                 const resp = await fetch(`${API_BASE}/tracks?${params}`, { method: 'POST' });
                 if (!resp.ok) {
                     const err = await resp.json().catch(() => ({}));
                     throw new Error(err.detail || `Error ${resp.status}`);
                 }
-                document.getElementById('track-status').textContent = 'Flight tracked! You will be emailed on price drops.';
-                document.getElementById('track-status').style.color = '#27ae60';
+                modalStatusEl.textContent = 'Flight tracked! You will be emailed on price drops.';
+                modalStatusEl.style.color = '#27ae60';
                 setTimeout(() => { closeTrackModal(); loadTrackedFlights(); }, 1200);
             } catch (e) {
-                document.getElementById('track-status').textContent = e.message;
-                document.getElementById('track-status').style.color = '#e74c3c';
+                modalStatusEl.textContent = e.message;
+                modalStatusEl.style.color = '#e74c3c';
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Start Tracking';
@@ -1925,16 +2230,28 @@
 
         async function loadTrackedFlights() {
             try {
-                const resp = await fetch(`${API_BASE}/tracks`);
+                const headers = trackedAdminToken ? { 'X-Admin-Token': trackedAdminToken } : {};
+                const resp = await fetch(`${API_BASE}/tracks`, { headers });
+                if (resp.status === 401 && trackedAdminToken) {
+                    trackedAdminToken = '';
+                    trackedAdminMode = false;
+                    updateTrackedAdminUi();
+                    return loadTrackedFlights();
+                }
                 if (!resp.ok) throw new Error('Could not load tracked flights');
                 const data = await resp.json();
                 const list = document.getElementById('tracked-list');
                 const emptyEl = document.getElementById('tracked-empty');
                 const badge = document.getElementById('tab-badge');
+                trackedAdminMode = Boolean(data.admin_view);
+                updateTrackedAdminUi();
 
-                const count = (data.tracks || []).length;
+                const groupedTracks = normalizeTrackedRoutes(data.tracks || []);
+                currentTrackedRoutes = groupedTracks;
+                const count = groupedTracks.length;
                 badge.textContent = count;
                 badge.style.display = count > 0 ? 'inline' : 'none';
+                document.getElementById('tracked-summary').innerHTML = `<strong>${count} route${count === 1 ? '' : 's'}</strong> currently being tracked`;
 
                 if (count === 0) {
                     emptyEl.style.display = 'block';
@@ -1943,25 +2260,253 @@
                 }
 
                 emptyEl.style.display = 'none';
-                list.innerHTML = data.tracks.map((t) => {
-                    const price = t.latest_price != null ? formatCurrency(t.latest_price) : 'N/A';
-                    const emailShort = (t.user_email || '').replace(/(.{3}).*(@.*)/, '$1...$2');
+                list.innerHTML = groupedTracks.map((t) => {
+                    const formattedDate = formatTrackedDate(t.departure_date);
+                    const subscriberText = `${Number(t.subscriber_count || 0)} subscriber${Number(t.subscriber_count || 0) === 1 ? '' : 's'}`;
+                    const adminAction = trackedAdminMode
+                        ? `<button class="admin-route-btn" data-route-origin="${escapeHtml(t.origin || '')}" data-route-destination="${escapeHtml(t.destination || '')}" data-route-date="${escapeHtml(t.departure_date || '')}" data-route-track-ids="${escapeHtml((t.track_ids || []).join(','))}">Manage Subscribers</button>`
+                        : '';
                     return `
                     <div class="tracked-card">
                         <div>
                             <div class="tracked-route">${escapeHtml(t.origin || '')} \u2192 ${escapeHtml(t.destination || '')}</div>
-                            <div class="tracked-meta">${escapeHtml(t.departure_date || '')} \u00b7 Baseline: ${price} \u00b7 ${escapeHtml(emailShort)}</div>
+                            <div class="tracked-meta">Departs ${escapeHtml(formattedDate)} \u00b7 ${escapeHtml(subscriberText)}</div>
                         </div>
-                        <button class="stop-btn" data-track-id="${escapeHtml(t.id)}">Stop Tracking</button>
+                        ${adminAction}
                     </div>`;
                 }).join('');
 
-                list.querySelectorAll('.stop-btn').forEach(btn => {
-                    btn.addEventListener('click', () => deleteTrack(btn.dataset.trackId));
+                list.querySelectorAll('.admin-route-btn').forEach(btn => {
+                    btn.addEventListener('click', () => openRouteAdminModal(
+                        btn.dataset.routeOrigin,
+                        btn.dataset.routeDestination,
+                        btn.dataset.routeDate,
+                        btn.dataset.routeTrackIds,
+                    ));
                 });
             } catch (e) {
                 // Firestore may be unavailable
             }
+        }
+
+        function formatTrackedDate(dateValue) {
+            if (!dateValue) return 'date unavailable';
+
+            const raw = String(dateValue).trim();
+            if (!raw) return 'date unavailable';
+
+            const normalized = raw.split('T', 1)[0].trim();
+            const parts = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (!parts) return normalized || raw;
+
+            const year = Number(parts[1]);
+            const monthIndex = Number(parts[2]) - 1;
+            const day = Number(parts[3]);
+            const date = new Date(year, monthIndex, day);
+            if (Number.isNaN(date.getTime())) return normalized;
+
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        }
+
+        function normalizeTrackedRoutes(rawTracks = []) {
+            const grouped = new Map();
+
+            rawTracks.forEach((track) => {
+                const origin = track.origin || '';
+                const destination = track.destination || '';
+                const departureDate = track.departure_date || '';
+                const key = `${origin}__${destination}__${departureDate}`;
+
+                if (!grouped.has(key)) {
+                    grouped.set(key, {
+                        origin,
+                        destination,
+                        departure_date: departureDate,
+                        subscriber_count: 0,
+                        track_ids: [],
+                        subscribers: [],
+                    });
+                }
+
+                const entry = grouped.get(key);
+                const explicitCount = Number(track.subscriber_count || 0);
+                if (explicitCount > 0) {
+                    entry.subscriber_count = Math.max(entry.subscriber_count, explicitCount);
+                } else {
+                    entry.subscriber_count += 1;
+                }
+
+                if (Array.isArray(track.track_ids)) {
+                    track.track_ids.forEach((trackId) => {
+                        if (trackId && !entry.track_ids.includes(trackId)) {
+                            entry.track_ids.push(trackId);
+                        }
+                    });
+                } else if (track.id && !entry.track_ids.includes(track.id)) {
+                    entry.track_ids.push(track.id);
+                }
+
+                if (Array.isArray(track.subscribers)) {
+                    track.subscribers.forEach((subscriber) => {
+                        if (subscriber?.id && !entry.subscribers.some((item) => item.id === subscriber.id)) {
+                            entry.subscribers.push(subscriber);
+                        }
+                    });
+                } else if (track.user_email || track.id) {
+                    entry.subscribers.push({
+                        id: track.id,
+                        user_email: track.user_email,
+                        latest_price: track.latest_price,
+                        adults: track.adults,
+                    });
+                }
+            });
+
+            return Array.from(grouped.values()).sort((a, b) => {
+                const aTime = new Date(`${a.departure_date || ''}T00:00:00`).getTime();
+                const bTime = new Date(`${b.departure_date || ''}T00:00:00`).getTime();
+                const safeATime = Number.isNaN(aTime) ? Number.MAX_SAFE_INTEGER : aTime;
+                const safeBTime = Number.isNaN(bTime) ? Number.MAX_SAFE_INTEGER : bTime;
+
+                if (safeATime !== safeBTime) return safeATime - safeBTime;
+                return `${a.origin || ''}${a.destination || ''}`.localeCompare(`${b.origin || ''}${b.destination || ''}`);
+            });
+        }
+
+        function updateTrackedAdminUi() {
+            const btn = document.getElementById('tracked-admin-btn');
+            if (trackedAdminMode) {
+                btn.textContent = 'Exit Subscription Manager';
+            } else {
+                btn.textContent = 'Manage Subscriptions';
+            }
+        }
+
+        async function toggleTrackedAdminMode() {
+            if (trackedAdminMode) {
+                trackedAdminToken = '';
+                trackedAdminMode = false;
+                updateTrackedAdminUi();
+                await loadTrackedFlights();
+                return;
+            }
+
+            openAdminAuthModal();
+        }
+
+        function openAdminAuthModal() {
+            document.getElementById('admin-auth-status').textContent = '';
+            document.getElementById('admin-password-input').value = '';
+            document.getElementById('admin-auth-overlay').classList.add('active');
+            setTimeout(() => document.getElementById('admin-password-input').focus(), 0);
+        }
+
+        function closeAdminAuthModal() {
+            document.getElementById('admin-auth-overlay').classList.remove('active');
+        }
+
+        async function submitAdminAuth() {
+            const input = document.getElementById('admin-password-input');
+            const token = input.value.trim();
+            if (!token) {
+                document.getElementById('admin-auth-status').textContent = 'Enter the admin password.';
+                document.getElementById('admin-auth-status').style.color = '#e74c3c';
+                return;
+            }
+
+            trackedAdminToken = token;
+            await loadTrackedFlights();
+            if (trackedAdminMode) {
+                closeAdminAuthModal();
+            } else {
+                trackedAdminToken = '';
+                document.getElementById('admin-auth-status').textContent = 'Admin sign-in failed.';
+                document.getElementById('admin-auth-status').style.color = '#e74c3c';
+            }
+        }
+
+        async function openRouteAdminModal(origin, destination, departureDate, trackIds = '') {
+            currentRouteAdminRoute = { origin, destination, departureDate, trackIds };
+            const travelerText = '';
+            document.getElementById('route-admin-subtitle').textContent = `${origin} → ${destination} · Departs ${formatTrackedDate(departureDate)} · ${travelerText}`;
+            document.getElementById('route-admin-subtitle').textContent = `${origin} → ${destination} · Departs ${formatTrackedDate(departureDate)}`;
+            document.getElementById('route-admin-status').textContent = '';
+            document.getElementById('route-admin-overlay').classList.add('active');
+
+            const route = currentTrackedRoutes.find((item) =>
+                (item.origin || '') === origin &&
+                (item.destination || '') === destination &&
+                (item.departure_date || '') === departureDate
+            );
+            const subscribers = route?.subscribers || [];
+            const list = document.getElementById('route-admin-list');
+
+            if (subscribers.length === 0) {
+                list.innerHTML = '<div class="tracked-empty">No subscribers found for this route.</div>';
+                return;
+            }
+
+            list.innerHTML = subscribers.map((track) => {
+                const adults = Number(track.adults || 1);
+                return `
+                    <div class="subscriber-card">
+                        <div>
+                            <div class="subscriber-email">${escapeHtml(track.user_email || 'Unknown email')}</div>
+                            <div class="subscriber-meta">${adults} traveler${adults === 1 ? '' : 's'}</div>
+                        </div>
+                        <button class="stop-btn" type="button" data-track-id="${escapeHtml(track.id)}">Stop Tracking</button>
+                    </div>
+                `;
+            }).join('');
+
+            list.querySelectorAll('.stop-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    document.getElementById('route-admin-status').textContent = '';
+                    const deleted = await deleteTrack(btn.dataset.trackId);
+                    if (!deleted) return;
+
+                    currentTrackedRoutes = currentTrackedRoutes.map((item) => {
+                        if (
+                            (item.origin || '') === origin &&
+                            (item.destination || '') === destination &&
+                            (item.departure_date || '') === departureDate
+                        ) {
+                            return {
+                                ...item,
+                                subscriber_count: Math.max(0, Number(item.subscriber_count || 0) - 1),
+                                subscribers: (item.subscribers || []).filter((subscriber) => subscriber.id !== btn.dataset.trackId),
+                            };
+                        }
+                        return item;
+                    }).filter((item) => Number(item.subscriber_count || 0) > 0);
+
+                    document.getElementById('route-admin-status').textContent = 'Subscriber removed from this route.';
+                    document.getElementById('route-admin-status').style.color = '#27ae60';
+
+                    await loadTrackedFlights();
+                    const updatedRoute = currentTrackedRoutes.find((item) =>
+                        (item.origin || '') === origin &&
+                        (item.destination || '') === destination &&
+                        (item.departure_date || '') === departureDate
+                    );
+
+                    if (!updatedRoute || !updatedRoute.subscribers || updatedRoute.subscribers.length === 0) {
+                        closeRouteAdminModal();
+                        return;
+                    }
+
+                    await openRouteAdminModal(origin, destination, departureDate, trackIds);
+                });
+            });
+        }
+
+        function closeRouteAdminModal() {
+            document.getElementById('route-admin-overlay').classList.remove('active');
+            currentRouteAdminRoute = null;
         }
 
         // Tab switching
@@ -1977,11 +2522,28 @@
 
         async function deleteTrack(trackId) {
             try {
-                const resp = await fetch(`${API_BASE}/tracks/${trackId}`, { method: 'DELETE' });
-                if (!resp.ok) throw new Error('Delete failed');
-                loadTrackedFlights();
+                const resp = await fetch(`${API_BASE}/tracks/${trackId}`, {
+                    method: 'DELETE',
+                    headers: trackedAdminToken ? { 'X-Admin-Token': trackedAdminToken } : {},
+                });
+                if (resp.status === 401 && trackedAdminToken) {
+                    trackedAdminToken = '';
+                    trackedAdminMode = false;
+                    updateTrackedAdminUi();
+                    throw new Error('Admin session expired. Please sign in again.');
+                }
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Delete failed');
+                }
+                return true;
             } catch (e) {
-                // Silently fail
+                const statusEl = document.getElementById('route-admin-status');
+                if (statusEl) {
+                    statusEl.textContent = e.message || 'Could not stop tracking.';
+                    statusEl.style.color = '#e74c3c';
+                }
+                return false;
             }
         }
 
@@ -2057,8 +2619,10 @@
                     };
                     showStatus(`Found ${data.flights.length} flights`, 'success');
                     displayFlights(latestSearchData);
+                    updateTrackPanel(latestSearchData);
                     await runPurchaseGuidance(latestSearchData);
                 } else {
+                    latestSearchData = null;
                     showStatus('No flights found for this route', 'error');
                     clearResults();
                     hideAdvisor('No flight data available for price guidance.');
@@ -2123,13 +2687,6 @@
                 copyEl.textContent = 'Enter your email and we’ll notify you if this route gets cheaper.';
             }
 
-            if (!emailInput.value.trim()) {
-                const savedEmail = window.localStorage.getItem(TRACKING_EMAIL_STORAGE_KEY) || '';
-                if (savedEmail) {
-                    emailInput.value = savedEmail;
-                }
-            }
-
             hideTrackStatus();
         }
 
@@ -2158,7 +2715,8 @@
                 origin: latestSearchData.origin,
                 destination: latestSearchData.destination,
                 departure_date: latestSearchData.departure_date,
-                user_email: userEmail
+                user_email: userEmail,
+                passengers: String(latestSearchData.passengers || document.getElementById('passengers').value || 1)
             });
 
             trackButton.disabled = true;
@@ -2175,7 +2733,6 @@
                     throw new Error(data.detail || `Unable to create track (${response.status})`);
                 }
 
-                window.localStorage.setItem(TRACKING_EMAIL_STORAGE_KEY, userEmail);
                 showTrackStatus(data.message || 'Flight alert created.', 'success');
             } catch (error) {
                 showTrackStatus(error.message || 'Unable to create alert right now.', 'error');
@@ -2426,7 +2983,7 @@
             document.getElementById('metric-savings').textContent = formatCurrency(prediction.estimated_savings || 0);
             document.getElementById('metric-window').textContent = prediction.expected_dip_window || '—';
             document.getElementById('metric-current-sub').textContent = `Best current fare across ${payload.current_flights.length} results`;
-            document.getElementById('metric-predicted-sub').textContent = prediction.source_mode === 'model' ? 'Predicted by Python service' : 'Estimated fallback target';
+            document.getElementById('metric-predicted-sub').textContent = prediction.source_mode === 'model' ? 'Predicted by us' : 'Estimated fallback target';
             document.getElementById('metric-savings-sub').textContent = `≈ ${formatCurrency(totalSavings)} total for ${passengers} traveler${passengers > 1 ? 's' : ''}`;
             document.getElementById('metric-window-sub').textContent = payload.days_until_departure > 0
                 ? `${payload.days_until_departure} day${payload.days_until_departure === 1 ? '' : 's'} until departure`
@@ -2521,10 +3078,11 @@
                 const destination = flight.destination || data.destination;
                 const departure = flight.departure_datetime || flight.departure;
                 const arrival = flight.arrival_datetime || flight.arrival;
-                const formattedDuration = formatDuration(flight.duration);
-                const aircraft = String(flight.aircraft || '').trim();
+                const duration = formatDuration(flight.duration);
+                const aircraft = flight.aircraft || 'N/A';
+                const headerAircraftText = `${airline} ${flightNum}`.trim() || 'N/A';
+                const aircraftDisplay = aircraft && aircraft !== 'N/A' ? aircraft : headerAircraftText;
                 const bookingLink = getBookingLink(flight);
-
                 let badgeClass = 'fair';
                 let badgeText = 'Fair fare';
 
@@ -2538,15 +3096,15 @@
 
                 const cardClasses = `flight-card${bookingLink ? ' has-booking-link' : ''}`;
                 const titleAttr = bookingLink ? 'title="Book now on airline website"' : '';
-                const clickAttrs = bookingLink
-                    ? `data-booking-link="${escapeHtml(bookingLink)}" tabindex="0" role="link"`
+                const bookingCaret = bookingLink
+                    ? `<a class="booking-caret" href="${escapeHtml(bookingLink)}" target="_blank" rel="noopener noreferrer" aria-label="Open airline website">›</a>`
                     : '';
 
                 return `
-                <div class="${cardClasses}" ${titleAttr} ${clickAttrs}>
+                <div class="${cardClasses}" ${titleAttr}>
+                    ${bookingCaret}
                     <div class="flight-header">
                         <div>
-                            <div class="airline">${escapeHtml(airline)} ${escapeHtml(flightNum)}</div>
                             <div class="flight-badge-row">
                                 <span class="small-badge ${badgeClass}">${escapeHtml(badgeText)}</span>
                             </div>
@@ -2564,32 +3122,27 @@
                             <div class="time">${escapeHtml(formatDateTime(arrival))}</div>
                         </div>
                     </div>
-                    <div class="duration">${escapeHtml(formattedDuration)}${aircraft ? ` • Aircraft: ${escapeHtml(aircraft)}` : ''}</div>
+                    <div class="flight-footer">
+                        <div class="duration">Duration: ${escapeHtml(duration)}<span class="duration-aircraft">Aircraft: ${escapeHtml(aircraftDisplay)}</span></div>
+                        <button class="track-btn" data-track-origin="${escapeHtml(origin)}" data-track-dest="${escapeHtml(destination)}" data-track-date="${escapeHtml(data.departure_date || '')}" data-track-price="${priceValue || 0}">Track Price</button>
+                    </div>
                 </div>
                 `;
             }).join('');
 
-            container.querySelectorAll('.flight-card.has-booking-link').forEach(card => {
-                const bookingLink = card.dataset.bookingLink;
-                if (!bookingLink) return;
-
-                card.addEventListener('click', () => {
-                    window.open(bookingLink, '_blank', 'noopener,noreferrer');
-                });
-
-                card.addEventListener('keydown', (event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        window.open(bookingLink, '_blank', 'noopener,noreferrer');
-                    }
+            // Track button event delegation (avoids inline onclick XSS risk)
+            container.querySelectorAll('.track-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openTrackModal(btn.dataset.trackOrigin, btn.dataset.trackDest, btn.dataset.trackDate, Number(btn.dataset.trackPrice));
                 });
             });
 
-            updateTrackPanel(data);
             resultsEl.style.display = 'block';
         }
 
         function clearResults() {
+            latestSearchData = null;
             document.getElementById('track-panel').style.display = 'none';
             hideTrackStatus();
             document.getElementById('flights-container').innerHTML = `
@@ -2615,24 +3168,40 @@
             });
         }
 
-        function formatDuration(durationStr) {
-            const raw = String(durationStr || '').trim();
-            if (!raw) return 'Duration unavailable';
+        function formatDuration(durationValue) {
+            if (!durationValue) return 'Duration unavailable';
 
-            const isoMatch = raw.match(/^PT(?:(\d+)H)?(?:(\d+)M)?$/i);
-            if (!isoMatch) {
-                return raw === 'N/A' ? 'Duration unavailable' : `Duration: ${raw}`;
+            const text = String(durationValue).trim();
+            if (!text) return 'Duration unavailable';
+
+            const isoMatch = text.match(/^PT(?:(\d+)H)?(?:(\d+)M)?$/i);
+            if (isoMatch) {
+                const hours = Number(isoMatch[1] || 0);
+                const minutes = Number(isoMatch[2] || 0);
+                if (hours && minutes) return `${hours}h ${minutes}m`;
+                if (hours) return `${hours}h`;
+                if (minutes) return `${minutes}m`;
             }
 
-            const hours = Number(isoMatch[1] || 0);
-            const minutes = Number(isoMatch[2] || 0);
-            const parts = [];
+            const hoursMatch = text.match(/(\d+)\s*(?:h|hr|hrs|hour|hours)\b/i);
+            const minutesMatch = text.match(/(\d+)\s*(?:m|min|mins|minute|minutes)\b/i);
+            if (hoursMatch || minutesMatch) {
+                const hours = hoursMatch ? Number(hoursMatch[1]) : 0;
+                const minutes = minutesMatch ? Number(minutesMatch[1]) : 0;
+                if (hours && minutes) return `${hours}h ${minutes}m`;
+                if (hours) return `${hours}h`;
+                if (minutes) return `${minutes}m`;
+            }
 
-            if (hours) parts.push(`${hours}h`);
-            if (minutes) parts.push(`${minutes}m`);
-            if (!parts.length) parts.push('0m');
+            const compactMatch = text.match(/^(\d+)\s*h(?:\s*(\d+)\s*m?)?$/i);
+            if (compactMatch) {
+                const hours = Number(compactMatch[1] || 0);
+                const minutes = Number(compactMatch[2] || 0);
+                if (hours && minutes) return `${hours}h ${minutes}m`;
+                if (hours) return `${hours}h`;
+            }
 
-            return `Duration: ${parts.join(' ')}`;
+            return text.replace(/\s+/g, ' ');
         }
 
         // ── Budget Explorer ──────────────────────────────────────────────
@@ -2722,14 +3291,36 @@
         document.getElementById('budget-explorer-btn').addEventListener('click', openExplorer);
         document.getElementById('explorer-close-btn').addEventListener('click', closeExplorer);
         document.getElementById('explorer-show-all-btn').addEventListener('click', showAllDestinations);
+        document.getElementById('tracked-admin-btn').addEventListener('click', toggleTrackedAdminMode);
+        document.getElementById('admin-auth-cancel-btn').addEventListener('click', closeAdminAuthModal);
+        document.getElementById('admin-auth-submit-btn').addEventListener('click', submitAdminAuth);
+        document.getElementById('route-admin-close-btn').addEventListener('click', closeRouteAdminModal);
+
+        document.getElementById('admin-password-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') submitAdminAuth();
+        });
 
         document.getElementById('explorer-overlay').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) closeExplorer();
         });
 
+        document.getElementById('admin-auth-overlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeAdminAuthModal();
+        });
+
+        document.getElementById('route-admin-overlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeRouteAdminModal();
+        });
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && document.getElementById('explorer-overlay').classList.contains('active')) {
                 closeExplorer();
+            }
+            if (e.key === 'Escape' && document.getElementById('admin-auth-overlay').classList.contains('active')) {
+                closeAdminAuthModal();
+            }
+            if (e.key === 'Escape' && document.getElementById('route-admin-overlay').classList.contains('active')) {
+                closeRouteAdminModal();
             }
         });
 
@@ -2889,7 +3480,6 @@
                             ${depTime ? `<div class="dest-detail-row"><span>Departs</span><span>${escapeHtml(depTime)}</span></div>` : ''}
                             ${arrTime ? `<div class="dest-detail-row"><span>Arrives</span><span>${escapeHtml(arrTime)}</span></div>` : ''}
                             ${duration ? `<div class="dest-detail-row"><span>Duration</span><span>${escapeHtml(duration)}</span></div>` : ''}
-                            ${aircraft ? `<div class="dest-detail-row"><span>Aircraft</span><span>${escapeHtml(aircraft)}</span></div>` : ''}
                             <button class="dest-search-btn" data-origin="${escapeHtml(data.origin)}" data-dest="${escapeHtml(dest.destination)}">Search this route</button>
                         </div>
                     </div>

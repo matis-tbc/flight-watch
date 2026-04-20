@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """flightwatch api - gcs support, no pandas, python 3.13"""
-from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi import FastAPI, Header, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -136,46 +136,100 @@ def check_gcs_configured() -> bool:
     return GCS_AVAILABLE and gcs_data_service_simple.is_configured()
 
 
-def _format_scaled_price(value: float) -> str:
-    return f"{value:.2f}"
+def _get_admin_token() -> str:
+    return os.getenv("ADMIN_TOKEN", "").strip()
 
 
-def _scale_flights_for_passengers(flights: List[Dict[str, Any]], passengers: int) -> List[Dict[str, Any]]:
-    """
-    GCS and mock flight data are stored as a single-traveler fare.
-    Scale the displayed total so the UI reflects the selected traveler count.
-    """
-    safe_passengers = max(1, int(passengers or 1))
-    if safe_passengers == 1:
+def _validate_admin_token(raw_token: Optional[str]) -> bool:
+    expected = _get_admin_token()
+    return bool(expected and raw_token and raw_token.strip() == expected)
+
+
+def _require_admin_token(raw_token: Optional[str]) -> None:
+    if not _validate_admin_token(raw_token):
+        raise HTTPException(status_code=401, detail="Valid admin token required.")
+
+
+def _group_tracks_by_route(track_docs, include_admin_fields: bool = False) -> List[Dict[str, Any]]:
+    grouped: Dict[tuple, Dict[str, Any]] = {}
+
+    for doc in track_docs:
+        track_data = doc.to_dict() or {}
+        key = (
+            track_data.get("origin"),
+            track_data.get("destination"),
+            track_data.get("departure_date"),
+        )
+        if key not in grouped:
+            grouped[key] = {
+                "origin": track_data.get("origin"),
+                "destination": track_data.get("destination"),
+                "departure_date": track_data.get("departure_date"),
+                "subscriber_count": 0,
+            }
+            if include_admin_fields:
+                grouped[key]["track_ids"] = []
+                grouped[key]["subscribers"] = []
+
+        grouped[key]["subscriber_count"] += 1
+        if include_admin_fields:
+            grouped[key]["track_ids"].append(doc.id)
+            grouped[key]["subscribers"].append({
+                "id": doc.id,
+                "user_email": track_data.get("user_email"),
+                "latest_price": track_data.get("latest_price"),
+                "adults": track_data.get("adults", 1),
+            })
+
+    grouped_routes = sorted(
+        grouped.values(),
+        key=lambda item: (
+            item.get("departure_date") or "",
+            item.get("origin") or "",
+            item.get("destination") or "",
+        ),
+    )
+    return grouped_routes
+
+
+def _normalize_passenger_count(passengers: int) -> int:
+    try:
+        return max(int(passengers), 1)
+    except (TypeError, ValueError):
+        return 1
+
+
+def _scale_price_value(raw_value: Any, passengers: int) -> Any:
+    if raw_value is None:
+        return None
+    try:
+        scaled = float(str(raw_value).replace(",", "").strip()) * passengers
+    except (TypeError, ValueError):
+        return raw_value
+    return f"{scaled:.2f}"
+
+
+def _scale_flight_prices(flights: List[Dict[str, Any]], passengers: int) -> List[Dict[str, Any]]:
+    passenger_count = _normalize_passenger_count(passengers)
+    if passenger_count == 1:
         return flights
 
-    scaled_flights = []
+    scaled_flights: List[Dict[str, Any]] = []
     for flight in flights:
-        scaled = copy.deepcopy(flight)
+        scaled = dict(flight)
 
-        if "total_price" in scaled:
-            try:
-                base_total = float(str(scaled["total_price"]).replace(",", "").strip())
-                scaled["total_price"] = _format_scaled_price(base_total * safe_passengers)
-            except (TypeError, ValueError):
-                pass
+        if isinstance(flight.get("price"), dict):
+            scaled_price = dict(flight["price"])
+            scaled_total = _scale_price_value(scaled_price.get("total"), passenger_count)
+            if scaled_total is not None:
+                scaled_price["total"] = scaled_total
+            scaled["price"] = scaled_price
 
-        price_value = scaled.get("price")
-        if isinstance(price_value, dict) and "total" in price_value:
-            try:
-                base_total = float(str(price_value["total"]).replace(",", "").strip())
-                scaled["price"]["total"] = _format_scaled_price(base_total * safe_passengers)
-            except (TypeError, ValueError):
-                pass
-        elif isinstance(price_value, (int, float, str)):
-            try:
-                base_total = float(str(price_value).replace(",", "").strip())
-                scaled["price"] = _format_scaled_price(base_total * safe_passengers)
-            except (TypeError, ValueError):
-                pass
+        for field_name in ("total_price", "flight_price"):
+            if field_name in flight:
+                scaled[field_name] = _scale_price_value(flight.get(field_name), passenger_count)
 
-        scaled["price_basis"] = "total_for_all_passengers"
-        scaled["passengers_priced"] = safe_passengers
+        scaled["passengers"] = passenger_count
         scaled_flights.append(scaled)
 
     return scaled_flights
@@ -353,6 +407,7 @@ async def search_flights(
     limit: int = 50
 ):
     """search flights - gcs first, then amadeus, then mock"""
+    passengers = _normalize_passenger_count(passengers)
     actual_departure_date = normalize_date_text(departure_date)
     normalized_return_date = normalize_date_text(return_date)
     if not actual_departure_date:
@@ -369,18 +424,29 @@ async def search_flights(
             )
             
             if flights:
-                return {
+                scaled_flights = _scale_flight_prices(flights, passengers)
+                # Detect if date fallback was used (flights don't match requested date)
+                date_note = None
+                first_dt = gcs_data_service_simple._get_field(flights[0], 'departure_datetime', 'departure_date', 'date', 'departure')[:10] if flights else ""
+                if first_dt and not first_dt.startswith(actual_departure_date):
+                    dr = gcs_data_service_simple.get_date_range()
+                    range_str = f"{dr['earliest_date']} to {dr['latest_date']}" if dr else "available dates"
+                    date_note = f"Showing closest available flights (data covers {range_str})"
+
+                result = {
                     "origin": origin,
                     "destination": destination,
                     "departure_date": actual_departure_date,
                     "return_date": normalized_return_date,
                     "passengers": passengers,
-                    "flights": priced_flights,
+                    "flights": scaled_flights[:limit],
                     "source": "gcs",
                     "count": len(flights),
                     "status": "success: gcs flight data",
                     "note": f"found {len(flights)} flights from gcs"
                 }
+                if passengers > 1:
+                    result["pricing_basis"] = "scaled_from_single_passenger_dataset"
                 if date_note:
                     result["date_note"] = date_note
                 return result
@@ -427,13 +493,11 @@ async def search_flights(
         "departure_date": actual_departure_date,
         "return_date": normalized_return_date,
         "passengers": passengers,
-        "flights": _scale_flights_for_passengers(
-            get_mock_flights(origin, destination, actual_departure_date)[:limit],
-            passengers,
-        ),
+        "flights": _scale_flight_prices(get_mock_flights(origin, destination, actual_departure_date), passengers)[:limit],
         "source": "mock",
         "status": "WARNING: Using mock data",
-        "note": "⚠️ Configure GCS or Amadeus for real flight data"
+        "note": "⚠️ Configure GCS or Amadeus for real flight data",
+        "pricing_basis": "scaled_from_single_passenger_mock_data" if passengers > 1 else "single_passenger_mock_data"
     }
 
 @app.get("/api/explore")
@@ -482,6 +546,7 @@ async def create_track(
     destination: str,
     departure_date: str,
     user_email: str,                      # required — scheduler needs this to send emails
+    passengers: int = 1,
     return_date: Optional[str] = None,
     max_price: Optional[float] = None,
 ):
@@ -497,22 +562,30 @@ async def create_track(
     normalized_return_date = normalize_date_text(return_date)
     if not normalized_departure_date:
         raise HTTPException(status_code=400, detail="departure_date is required.")
+    passengers = _normalize_passenger_count(passengers)
 
-    # Fetch current price from GCS to use as the baseline for future comparisons
-    flights = gcs_data_service_simple.search_flights(
-        origin=origin,
-        destination=destination,
-        departure_date=normalized_departure_date,
-        limit=1,
-    )
+    # Best-effort baseline lookup; tracking should still work even if pricing data is unavailable.
+    flights = []
+    if check_gcs_configured():
+        try:
+            flights = gcs_data_service_simple.search_flights(
+                origin=origin,
+                destination=destination,
+                departure_date=normalized_departure_date,
+                limit=1,
+            )
+        except Exception as exc:
+            print(f"track baseline lookup error: {exc}")
 
     latest_price = None
     if flights:
         raw = flights[0].get("price")
         if isinstance(raw, dict):
             raw = raw.get("total")
+        if raw is None:
+            raw = flights[0].get("total_price") or flights[0].get("flight_price")
         try:
-            latest_price = float(str(raw).replace(",", "").strip()) if raw else None
+            latest_price = float(str(raw).replace(",", "").strip()) * passengers if raw else None
         except (TypeError, ValueError):
             latest_price = None
 
@@ -522,6 +595,7 @@ async def create_track(
         destination=destination,
         departure_date=normalized_departure_date,
         latest_price=latest_price,
+        adults=passengers,
         return_date=normalized_return_date,
     )
 
@@ -533,25 +607,79 @@ async def create_track(
         "destination": destination.upper(),
         "departure_date": normalized_departure_date,
         "return_date": normalized_return_date,
+        "passengers": passengers,
         "baseline_price": latest_price,
     }
 
 @app.get("/api/tracks")
-async def list_tracks():
-    """List all flight tracks from Firestore"""
-    tracks = []
-    for doc in get_tracked_flights():
-        track_data = doc.to_dict()
-        track_data["id"] = doc.id
-        tracks.append(track_data)
+async def list_tracks(x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token")):
+    """List tracked routes, with admin controls only when a valid admin token is supplied."""
+    is_admin = False
+    if x_admin_token is not None:
+        _require_admin_token(x_admin_token)
+        is_admin = True
+
+    track_docs = list(get_tracked_flights())
+    tracks = _group_tracks_by_route(track_docs, include_admin_fields=is_admin)
+
     return {
-        "count": len(tracks),
-        "tracks": tracks
+        "count": len(track_docs),
+        "route_count": len(tracks),
+        "tracks": tracks,
+        "admin_view": is_admin,
+    }
+
+
+@app.get("/api/tracks/details")
+async def track_details(
+    origin: str,
+    destination: str,
+    departure_date: str,
+    track_ids: Optional[str] = Query(None),
+    x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token"),
+):
+    """Return per-subscriber tracked-flight records for a specific route."""
+    _require_admin_token(x_admin_token)
+    normalized_departure_date = normalize_date_text(departure_date) or departure_date
+    requested_track_ids = {
+        part.strip() for part in str(track_ids or "").split(",")
+        if part and part.strip()
+    }
+
+    details = []
+    for doc in get_tracked_flights():
+        track_data = doc.to_dict() or {}
+        stored_departure_date = normalize_date_text(track_data.get("departure_date")) or (track_data.get("departure_date") or "")
+        matches_route = (
+            (track_data.get("origin") or "").strip().upper() == origin.strip().upper()
+            and (track_data.get("destination") or "").strip().upper() == destination.strip().upper()
+            and stored_departure_date == normalized_departure_date
+        )
+        matches_track_id = bool(requested_track_ids) and doc.id in requested_track_ids
+
+        if matches_track_id or matches_route:
+            details.append({
+                "id": doc.id,
+                "user_email": track_data.get("user_email"),
+                "origin": track_data.get("origin"),
+                "destination": track_data.get("destination"),
+                "departure_date": track_data.get("departure_date"),
+                "latest_price": track_data.get("latest_price"),
+                "adults": track_data.get("adults", 1),
+            })
+
+    return {
+        "count": len(details),
+        "origin": origin.upper(),
+        "destination": destination.upper(),
+        "departure_date": normalized_departure_date,
+        "tracks": details,
     }
 
 @app.get("/api/tracks/{track_id}")
-async def get_track(track_id: str):
+async def get_track(track_id: str, x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token")):
     """Get a specific track by Firestore doc ID"""
+    _require_admin_token(x_admin_token)
     doc = db.collection("tracked_flights").document(track_id).get()
     if not doc.exists:
         raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
@@ -560,8 +688,9 @@ async def get_track(track_id: str):
     return track_data
 
 @app.delete("/api/tracks/{track_id}")
-async def delete_track(track_id: str):
+async def delete_track(track_id: str, x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token")):
     """Delete a track from Firestore"""
+    _require_admin_token(x_admin_token)
     doc = db.collection("tracked_flights").document(track_id).get()
     if not doc.exists:
         raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
