@@ -85,7 +85,7 @@ def create_tracked_flight(
         return_date:    optional, e.g. 2026-04-10
     """
     doc_data = {
-        "user_email": user_email,
+        "user_email": str(user_email).strip().lower(),
         "origin": origin.strip().upper(),
         "destination": destination.strip().upper(),
         "departure_date": departure_date,
@@ -93,6 +93,8 @@ def create_tracked_flight(
         "latest_price": latest_price,
         "previous_price": None,
         "last_checked": None,
+        "notifications_enabled": True,
+        "status": "active",
         "created_at": firestore.SERVER_TIMESTAMP,
     }
     # Auto-generate doc ID
@@ -118,6 +120,30 @@ def get_tracked_flights_by_email(user_email: str):
         .where("user_email", "==", user_email)
         .stream()
     )
+
+
+def disable_notifications_for_email(user_email: str) -> int:
+    """
+    Disable email notifications for every tracked flight owned by the email address.
+    Returns the number of updated documents.
+    """
+    normalized_email = str(user_email or "").strip().lower()
+    if not normalized_email:
+        return 0
+
+    updated = 0
+    for doc in get_tracked_flights():
+        track_email = str((doc.to_dict() or {}).get("user_email", "")).strip().lower()
+        if track_email != normalized_email:
+            continue
+        doc.reference.update(
+            {
+                "notifications_enabled": False,
+                "unsubscribed_at": firestore.SERVER_TIMESTAMP,
+            }
+        )
+        updated += 1
+    return updated
 
 
 def update_price(doc_ref, new_price, current_price=None):

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """flightwatch api - gcs support, no pandas, python 3.13"""
 from fastapi import FastAPI, HTTPException, Query, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
+from html import escape
+import copy
 import os
 import sys
 from typing import Optional, List, Dict, Any
@@ -66,8 +68,10 @@ app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR, html=True), name="fro
 from firestore_logic import (
     FirestoreConfigurationError,
     delete_tracked_flight,
+    disable_notifications_for_email,
     get_tracked_flights,
 )
+from unsubscribe_tokens import is_valid_unsubscribe_token
 
 
 @app.exception_handler(FirestoreConfigurationError)
@@ -79,6 +83,45 @@ async def firestore_configuration_error_handler(_, exc: FirestoreConfigurationEr
 async def favicon():
     return Response(status_code=204)
 
+
+@app.get("/unsubscribe", include_in_schema=False, response_class=HTMLResponse)
+async def unsubscribe(email: str = "", token: str = ""):
+    normalized_email = str(email or "").strip().lower()
+    if not normalized_email or not token:
+        return HTMLResponse(
+            status_code=400,
+            content="""
+            <html><body style="font-family: Arial, sans-serif; padding: 32px;">
+              <h2>Invalid unsubscribe link</h2>
+              <p>This link is missing the information needed to process your request.</p>
+            </body></html>
+            """,
+        )
+
+    if not is_valid_unsubscribe_token(normalized_email, token):
+        return HTMLResponse(
+            status_code=400,
+            content="""
+            <html><body style="font-family: Arial, sans-serif; padding: 32px;">
+              <h2>Invalid unsubscribe link</h2>
+              <p>This unsubscribe link is not valid. Please use the latest email you received.</p>
+            </body></html>
+            """,
+        )
+
+    updated_count = disable_notifications_for_email(normalized_email)
+    track_label = "flight alert" if updated_count == 1 else "flight alerts"
+    safe_email = escape(normalized_email)
+    return HTMLResponse(
+        content=f"""
+        <html><body style="font-family: Arial, sans-serif; padding: 32px;">
+          <h2>Unsubscribed</h2>
+          <p>Email alerts have been turned off for <strong>{safe_email}</strong>.</p>
+          <p>Updated {updated_count} tracked {track_label}.</p>
+        </body></html>
+        """
+    )
+
 def check_amadeus_configured() -> bool:
     """check amadeus api config"""
     return (
@@ -89,6 +132,51 @@ def check_amadeus_configured() -> bool:
 def check_gcs_configured() -> bool:
     """check gcs config"""
     return GCS_AVAILABLE and gcs_data_service_simple.is_configured()
+
+
+def _format_scaled_price(value: float) -> str:
+    return f"{value:.2f}"
+
+
+def _scale_flights_for_passengers(flights: List[Dict[str, Any]], passengers: int) -> List[Dict[str, Any]]:
+    """
+    GCS and mock flight data are stored as a single-traveler fare.
+    Scale the displayed total so the UI reflects the selected traveler count.
+    """
+    safe_passengers = max(1, int(passengers or 1))
+    if safe_passengers == 1:
+        return flights
+
+    scaled_flights = []
+    for flight in flights:
+        scaled = copy.deepcopy(flight)
+
+        if "total_price" in scaled:
+            try:
+                base_total = float(str(scaled["total_price"]).replace(",", "").strip())
+                scaled["total_price"] = _format_scaled_price(base_total * safe_passengers)
+            except (TypeError, ValueError):
+                pass
+
+        price_value = scaled.get("price")
+        if isinstance(price_value, dict) and "total" in price_value:
+            try:
+                base_total = float(str(price_value["total"]).replace(",", "").strip())
+                scaled["price"]["total"] = _format_scaled_price(base_total * safe_passengers)
+            except (TypeError, ValueError):
+                pass
+        elif isinstance(price_value, (int, float, str)):
+            try:
+                base_total = float(str(price_value).replace(",", "").strip())
+                scaled["price"] = _format_scaled_price(base_total * safe_passengers)
+            except (TypeError, ValueError):
+                pass
+
+        scaled["price_basis"] = "total_for_all_passengers"
+        scaled["passengers_priced"] = safe_passengers
+        scaled_flights.append(scaled)
+
+    return scaled_flights
 
 @app.get("/")
 async def root():
@@ -269,13 +357,14 @@ async def search_flights(
             )
             
             if flights:
+                priced_flights = _scale_flights_for_passengers(flights[:limit], passengers)
                 return {
                     "origin": origin,
                     "destination": destination,
                     "departure_date": actual_departure_date,
                     "return_date": normalized_return_date,
                     "passengers": passengers,
-                    "flights": flights[:limit],
+                    "flights": priced_flights,
                     "source": "gcs",
                     "count": len(flights),
                     "status": "success: gcs flight data",
@@ -324,7 +413,10 @@ async def search_flights(
         "departure_date": actual_departure_date,
         "return_date": normalized_return_date,
         "passengers": passengers,
-        "flights": get_mock_flights(origin, destination, actual_departure_date)[:limit],
+        "flights": _scale_flights_for_passengers(
+            get_mock_flights(origin, destination, actual_departure_date)[:limit],
+            passengers,
+        ),
         "source": "mock",
         "status": "WARNING: Using mock data",
         "note": "⚠️ Configure GCS or Amadeus for real flight data"

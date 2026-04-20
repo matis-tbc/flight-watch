@@ -70,6 +70,13 @@ Next steps
 Deployment
 - Cloud Run deployment guide: [infra/README.md](/Users/sharonbayela/Documents/GitHub/flight-watch/infra/README.md)
 
+Live Deployment
+- Frontend: https://flightwatch-api-lsqbnpoonq-uc.a.run.app/frontend/simple_search.html
+- API: https://flightwatch-api-lsqbnpoonq-uc.a.run.app
+- API Docs: https://flightwatch-api-lsqbnpoonq-uc.a.run.app/docs
+- Scheduler: https://flightwatch-scheduler-lsqbnpoonq-uc.a.run.app
+- Note: These URLs point to the current production Cloud Run services for project `flightwatch-486618`.
+
 Open questions
 - Drop logic: absolute, percent, or window low?
 - Scheduler cadence: 6h vs 12h vs adaptive

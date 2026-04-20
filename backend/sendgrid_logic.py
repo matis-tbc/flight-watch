@@ -12,9 +12,22 @@ Flow:
 """
 import logging
 import os
+from urllib.parse import urlencode
 
 logger = logging.getLogger(__name__)
-APP_BASE_URL = os.getenv("APP_BASE_URL", "https://yourapp.com")
+
+from unsubscribe_tokens import build_unsubscribe_token
+
+
+def build_unsubscribe_url(to_email: str) -> str:
+    normalized_base = os.getenv("APP_BASE_URL", "https://yourapp.com").rstrip("/")
+    query = urlencode(
+        {
+            "email": str(to_email or "").strip().lower(),
+            "token": build_unsubscribe_token(to_email),
+        }
+    )
+    return f"{normalized_base}/unsubscribe?{query}"
 
 
 def send_price_drop_email(
@@ -51,6 +64,7 @@ def send_price_drop_email(
 
     savings = old_price - new_price
     savings_pct = (savings / old_price * 100) if old_price else 0
+    unsubscribe_url = build_unsubscribe_url(to_email)
 
     html_content = f"""
     <div style="font-family: -apple-system, Arial, sans-serif;
@@ -76,7 +90,7 @@ def send_price_drop_email(
       <hr style="margin: 28px 0; border: none; border-top: 1px solid #e5e7eb;">
       <p style="font-size: 0.72rem; color: #9ca3af;">
         You're receiving this because you're tracking this route on FlightWatch.<br>
-        <a href="{APP_BASE_URL}/unsubscribe" style="color: #9ca3af;">Unsubscribe</a>
+        <a href="{unsubscribe_url}" style="color: #9ca3af;">Unsubscribe</a>
       </p>
     </div>
     """
@@ -123,6 +137,7 @@ if __name__ == "__main__":
       1. Make sure backend/.env has all credentials set
       2. python sendgrid_logic.py
     """
+    import argparse
     import sys
     from dotenv import load_dotenv
     from firestore_logic import get_tracked_flights
@@ -130,6 +145,13 @@ if __name__ == "__main__":
 
     load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
     logging.basicConfig(level=logging.INFO)
+    parser = argparse.ArgumentParser(description="Manual SendGrid price-drop test.")
+    parser.add_argument(
+        "--force-demo-drop",
+        action="store_true",
+        help="Send a demo email by simulating a 15%% drop when no live price drop exists.",
+    )
+    args = parser.parse_args()
 
     print("API key loaded :", bool(os.getenv("SENDGRID_API_KEY")))
     print("FROM_EMAIL     :", os.getenv("FROM_EMAIL"))
@@ -165,11 +187,17 @@ if __name__ == "__main__":
         raw = flights[0].get("price")
         if isinstance(raw, dict):
             raw = raw.get("total")
-        new_price = float(str(raw).replace(",", "").strip()) if raw else old_price * 0.85
+        new_price = float(str(raw).replace(",", "").strip()) if raw else old_price
     else:
-        # No GCS result — simulate a 15% drop so email can still be tested
+        new_price = old_price
+        print(f"No GCS flights found for {origin} -> {destination}.")
+
+    if new_price >= old_price:
+        if not args.force_demo_drop:
+            print("No live price drop detected. No email sent.")
+            sys.exit(0)
         new_price = round(old_price * 0.85, 2)
-        print(f"No GCS flights found for {origin} -> {destination}, simulating 15% drop.")
+        print("No live price drop detected. Forcing a 15% demo drop because --force-demo-drop was passed.")
 
     flight_info = f"{origin} -> {destination} on {departure_date}"
 

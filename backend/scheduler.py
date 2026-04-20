@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 scheduler.py  — Flask microservice consumed by Cloud Scheduler
 
@@ -151,7 +153,9 @@ def check_prices():
                 data = doc.to_dict() or {}
 
                 # Skip soft-deleted tracks
-                if data.get("status") == "deleted":
+                if data.get("status") in {"deleted", "unsubscribed"}:
+                    continue
+                if data.get("notifications_enabled") is False:
                     continue
 
                 origin          = data.get("origin")
@@ -192,20 +196,21 @@ def check_prices():
                         else:
                             flight_info = f"{origin} → {destination} on {departure_date}"
                             try:
-                                send_price_drop_email(
+                                email_sent = send_price_drop_email(
                                     to_email=user_email,
                                     flight_info=flight_info,
                                     old_price=previous_price,
                                     new_price=latest_price,
                                 )
-                                log_notification_sent(
-                                    doc_id=doc.id,
-                                    user_email=user_email,
-                                    route=flight_info,
-                                    old_price=previous_price,
-                                    new_price=latest_price,
-                                )
-                                summary["emails_sent"] += 1
+                                if email_sent:
+                                    log_notification_sent(
+                                        doc_id=doc.id,
+                                        user_email=user_email,
+                                        route=flight_info,
+                                        old_price=previous_price,
+                                        new_price=latest_price,
+                                    )
+                                    summary["emails_sent"] += 1
                             except Exception as email_error:
                                 summary["email_errors"] += 1
                                 print(f"EMAIL_ERROR for {user_email}: {email_error}")

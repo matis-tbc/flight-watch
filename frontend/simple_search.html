@@ -479,6 +479,80 @@
             flex-wrap: wrap;
         }
 
+        .track-panel {
+            margin-bottom: 18px;
+            padding: 18px;
+            border-radius: 14px;
+            border: 1px solid #dbe4ff;
+            background: linear-gradient(180deg, #f8faff 0%, #eef3ff 100%);
+        }
+
+        .track-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+        }
+
+        .track-panel-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .track-panel-copy {
+            color: #5b6474;
+            font-size: 0.92rem;
+            line-height: 1.5;
+            margin-top: 4px;
+        }
+
+        .track-panel-route {
+            color: #4b5563;
+            font-size: 0.88rem;
+            font-weight: 700;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid #dfe7ff;
+            border-radius: 999px;
+            padding: 8px 12px;
+        }
+
+        .track-form {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 12px;
+            align-items: end;
+        }
+
+        .track-status {
+            display: none;
+            margin-top: 12px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 0.92rem;
+            font-weight: 600;
+        }
+
+        .track-status.success {
+            display: block;
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .track-status.error {
+            display: block;
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .track-status.info {
+            display: block;
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
         .summary-chip {
             background: #f3f4f6;
             color: #374151;
@@ -764,6 +838,10 @@
             .results-header,
             .advisor-top {
                 align-items: flex-start;
+            }
+
+            .track-form {
+                grid-template-columns: 1fr;
             }
         }
         /* Budget Explorer Modal */
@@ -1156,6 +1234,27 @@
                     <div class="summary-chip" id="summary-spread">Price spread: —</div>
                 </div>
             </div>
+            <div class="track-panel" id="track-panel" style="display: none;">
+                <div class="track-panel-header">
+                    <div>
+                        <div class="track-panel-title">Get price-drop alerts</div>
+                        <div class="track-panel-copy" id="track-panel-copy">
+                            Enter your email and we’ll notify you if this route gets cheaper.
+                        </div>
+                    </div>
+                    <div class="track-panel-route" id="track-panel-route">Route not selected</div>
+                </div>
+                <div class="track-form">
+                    <div class="form-group">
+                        <label for="track-email">Email for alerts</label>
+                        <input type="email" id="track-email" placeholder="you@example.com" autocomplete="email">
+                    </div>
+                    <button class="search-btn" id="track-button" type="button" style="margin-top: 0; grid-column: auto; padding: 14px 22px;">
+                        Track Price
+                    </button>
+                </div>
+                <div class="track-status" id="track-status"></div>
+            </div>
             <div id="flights-container"></div>
         </div>
     </div>
@@ -1223,6 +1322,7 @@
         const API_BASE = window.location.protocol === 'file:'
             ? 'http://localhost:8000/api'
             : '/api';
+        const TRACKING_EMAIL_STORAGE_KEY = 'flightwatch_tracking_email';
         let allAirports = [];
         let latestSearchData = null;
 
@@ -1516,6 +1616,14 @@
             showSuggestions('destination', 'destination-suggestions', e.target.value);
         });
 
+        document.getElementById('track-button').addEventListener('click', trackCurrentRoute);
+        document.getElementById('track-email').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                trackCurrentRoute();
+            }
+        });
+
         document.getElementById('swap-route-btn').addEventListener('click', () => {
             const originInput = document.getElementById('origin');
             const destinationInput = document.getElementById('destination');
@@ -1599,7 +1707,7 @@
                         departure_date: departureDate,
                         passengers: Number(passengers)
                     };
-                    showStatus(`Found ${data.flights.length} flights from ${data.source}`, 'success');
+                    showStatus(`Found ${data.flights.length} flights`, 'success');
                     displayFlights(latestSearchData);
                     await runPurchaseGuidance(latestSearchData);
                 } else {
@@ -1627,6 +1735,106 @@
             statusEl.textContent = message;
             statusEl.className = `status ${type}`;
             statusEl.style.display = 'block';
+        }
+
+        function showTrackStatus(message, type) {
+            const statusEl = document.getElementById('track-status');
+            statusEl.textContent = message;
+            statusEl.className = `track-status ${type}`;
+        }
+
+        function hideTrackStatus() {
+            const statusEl = document.getElementById('track-status');
+            statusEl.textContent = '';
+            statusEl.className = 'track-status';
+        }
+
+        function isValidEmail(email) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
+        }
+
+        function updateTrackPanel(data) {
+            const panel = document.getElementById('track-panel');
+            const routeEl = document.getElementById('track-panel-route');
+            const copyEl = document.getElementById('track-panel-copy');
+            const emailInput = document.getElementById('track-email');
+
+            if (!data || !data.origin || !data.destination || !data.departure_date) {
+                panel.style.display = 'none';
+                hideTrackStatus();
+                return;
+            }
+
+            panel.style.display = 'block';
+            routeEl.textContent = `${data.origin} → ${data.destination} • ${data.departure_date}`;
+
+            const stats = getFlightStats(data.flights || []);
+            if (stats.min > 0) {
+                copyEl.textContent = `Enter your email and we’ll notify you if this route drops below the current best fare of ${formatCurrency(stats.min)}.`;
+            } else {
+                copyEl.textContent = 'Enter your email and we’ll notify you if this route gets cheaper.';
+            }
+
+            if (!emailInput.value.trim()) {
+                const savedEmail = window.localStorage.getItem(TRACKING_EMAIL_STORAGE_KEY) || '';
+                if (savedEmail) {
+                    emailInput.value = savedEmail;
+                }
+            }
+
+            hideTrackStatus();
+        }
+
+        async function trackCurrentRoute() {
+            if (!latestSearchData || !latestSearchData.origin || !latestSearchData.destination) {
+                showTrackStatus('Search for a route before enabling alerts.', 'error');
+                return;
+            }
+
+            const emailInput = document.getElementById('track-email');
+            const trackButton = document.getElementById('track-button');
+            const userEmail = emailInput.value.trim().toLowerCase();
+
+            if (!isValidEmail(userEmail)) {
+                showTrackStatus('Enter a valid email address to receive alerts.', 'error');
+                emailInput.focus();
+                return;
+            }
+
+            if (!latestSearchData.departure_date) {
+                showTrackStatus('Select a departure date before tracking this route.', 'error');
+                return;
+            }
+
+            const params = new URLSearchParams({
+                origin: latestSearchData.origin,
+                destination: latestSearchData.destination,
+                departure_date: latestSearchData.departure_date,
+                user_email: userEmail
+            });
+
+            trackButton.disabled = true;
+            trackButton.style.opacity = '0.6';
+            showTrackStatus('Saving your alert...', 'info');
+
+            try {
+                const response = await fetch(`${API_BASE}/tracks?${params.toString()}`, {
+                    method: 'POST'
+                });
+                const data = await response.json().catch(() => ({}));
+
+                if (!response.ok) {
+                    throw new Error(data.detail || `Unable to create track (${response.status})`);
+                }
+
+                window.localStorage.setItem(TRACKING_EMAIL_STORAGE_KEY, userEmail);
+                showTrackStatus(data.message || 'Flight alert created.', 'success');
+            } catch (error) {
+                showTrackStatus(error.message || 'Unable to create alert right now.', 'error');
+            } finally {
+                trackButton.disabled = false;
+                trackButton.style.opacity = '';
+            }
         }
 
         function hideAdvisor(note = 'Waiting for a route search') {
@@ -1920,8 +2128,8 @@
                 const destination = flight.destination || data.destination;
                 const departure = flight.departure_datetime || flight.departure;
                 const arrival = flight.arrival_datetime || flight.arrival;
-                const duration = flight.duration || 'N/A';
-                const aircraft = flight.aircraft || 'N/A';
+                const formattedDuration = formatDuration(flight.duration);
+                const aircraft = String(flight.aircraft || '').trim();
                 const bookingLink = getBookingLink(flight);
 
                 let badgeClass = 'fair';
@@ -1963,7 +2171,7 @@
                             <div class="time">${escapeHtml(formatDateTime(arrival))}</div>
                         </div>
                     </div>
-                    <div class="duration">Duration: ${escapeHtml(duration)} • Aircraft: ${escapeHtml(aircraft)}</div>
+                    <div class="duration">${escapeHtml(formattedDuration)}${aircraft ? ` • Aircraft: ${escapeHtml(aircraft)}` : ''}</div>
                 </div>
                 `;
             }).join('');
@@ -1984,10 +2192,13 @@
                 });
             });
 
+            updateTrackPanel(data);
             resultsEl.style.display = 'block';
         }
 
         function clearResults() {
+            document.getElementById('track-panel').style.display = 'none';
+            hideTrackStatus();
             document.getElementById('flights-container').innerHTML = `
                 <div class="no-flights">
                     No flights found. Try a different route or date.
@@ -2009,6 +2220,26 @@
                 hour: '2-digit',
                 minute: '2-digit'
             });
+        }
+
+        function formatDuration(durationStr) {
+            const raw = String(durationStr || '').trim();
+            if (!raw) return 'Duration unavailable';
+
+            const isoMatch = raw.match(/^PT(?:(\d+)H)?(?:(\d+)M)?$/i);
+            if (!isoMatch) {
+                return raw === 'N/A' ? 'Duration unavailable' : `Duration: ${raw}`;
+            }
+
+            const hours = Number(isoMatch[1] || 0);
+            const minutes = Number(isoMatch[2] || 0);
+            const parts = [];
+
+            if (hours) parts.push(`${hours}h`);
+            if (minutes) parts.push(`${minutes}m`);
+            if (!parts.length) parts.push('0m');
+
+            return `Duration: ${parts.join(' ')}`;
         }
 
         // ── Budget Explorer ──────────────────────────────────────────────
