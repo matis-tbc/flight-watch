@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """flightwatch api - gcs support, no pandas, python 3.13"""
-from fastapi import FastAPI, Header, HTTPException, Query, Response
+from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from html import escape
 import copy
+import hmac
 import os
 import sys
 from typing import Optional, List, Dict, Any
@@ -57,6 +61,8 @@ except ImportError:
     GCS_AVAILABLE = False
     print("gcs service not available - pip install google-cloud-storage")
 
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(
     title="flightwatch api",
     description="flight price tracking with gcs data",
@@ -64,10 +70,14 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+_cors_base = os.getenv("APP_BASE_URL", "").strip()
+_cors_allowed = [_cors_base] if _cors_base else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_allowed,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -142,7 +152,9 @@ def _get_admin_token() -> str:
 
 def _validate_admin_token(raw_token: Optional[str]) -> bool:
     expected = _get_admin_token()
-    return bool(expected and raw_token and raw_token.strip() == expected)
+    if not expected or not raw_token:
+        return False
+    return hmac.compare_digest(raw_token.strip().encode("utf-8"), expected.encode("utf-8"))
 
 
 def _require_admin_token(raw_token: Optional[str]) -> None:
@@ -541,11 +553,13 @@ async def explore_destinations(
 
 
 @app.post("/api/tracks")
+@limiter.limit("10/hour")
 async def create_track(
+    request: Request,
     origin: str,
     destination: str,
     departure_date: str,
-    user_email: str,                      # required — scheduler needs this to send emails
+    user_email: str,
     passengers: int = 1,
     return_date: Optional[str] = None,
     max_price: Optional[float] = None,

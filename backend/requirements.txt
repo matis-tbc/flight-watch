@@ -17,6 +17,9 @@ sendgrid==6.11.0
 # Data collection (Google Flights scraper, no API key needed)
 fast-flights==2.2
 
+# Rate limiting
+slowapi==0.1.9
+
 # Testing
 pytest==8.3.4
 httpx==0.25.2

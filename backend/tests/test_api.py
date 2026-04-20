@@ -276,6 +276,33 @@ def test_delete_track_requires_admin_token(client):
     assert response.status_code == 401
 
 
+def test_tracks_admin_rejects_wrong_token(client, monkeypatch):
+    monkeypatch.setenv("ADMIN_TOKEN", "real-token")
+    response = client.get("/api/tracks/details",
+                          params={"origin": "JFK", "destination": "LAX", "departure_date": "2026-05-01"},
+                          headers={"X-Admin-Token": "wrong-token"})
+    assert response.status_code == 401
+
+
+def test_create_track_rate_limit_returns_429(client, monkeypatch):
+    from app_simple_gcs import limiter
+    limiter.reset()
+
+    monkeypatch.setattr(firestore_logic, "create_tracked_flight", lambda **kwargs: "doc")
+    if hasattr(app_simple_gcs, "create_tracked_flight"):
+        monkeypatch.setattr(app_simple_gcs, "create_tracked_flight", lambda **kwargs: "doc")
+    monkeypatch.setattr(app_simple_gcs, "check_gcs_configured", lambda: False)
+
+    params = {"origin": "JFK", "destination": "ORD",
+              "departure_date": "2026-04-15", "user_email": "rl@example.com"}
+    for i in range(10):
+        r = client.post("/api/tracks", params=params)
+        assert r.status_code == 200, f"request {i+1} unexpectedly failed: {r.status_code}"
+    r = client.post("/api/tracks", params=params)
+    assert r.status_code == 429
+    limiter.reset()
+
+
 def test_normalize_date_text_accepts_slash_format():
     assert normalize_date_text("04/08/2026") == "2026-04-08"
     assert normalize_date_text("2026-04-08T09:00:00") == "2026-04-08"

@@ -18,6 +18,7 @@ Imports from this project:
                                was_notified_recently(), log_notification_sent()
   sendgrid_logic           →  send_price_drop_email()
 """
+import hmac
 import json
 import os
 import time
@@ -79,7 +80,7 @@ def _is_authorized_scheduler_request() -> bool:
         print("WARNING: SCHEDULER_TOKEN not set -- all scheduler requests will be denied. Set it in .env")
         return False
     provided_token = request.headers.get("X-Scheduler-Token", "").strip()
-    return provided_token == required_token
+    return hmac.compare_digest(provided_token.encode("utf-8"), required_token.encode("utf-8"))
 
 
 def _normalize_departure_date(raw_value) -> str | None:
