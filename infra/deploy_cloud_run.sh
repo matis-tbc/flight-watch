@@ -28,6 +28,12 @@ AMADEUS_CLIENT_SECRET_SECRET="${AMADEUS_CLIENT_SECRET_SECRET:-}"
 SENDGRID_API_KEY_SECRET="${SENDGRID_API_KEY_SECRET:-}"
 SCHEDULER_TOKEN_SECRET="${SCHEDULER_TOKEN_SECRET:-}"
 ADMIN_TOKEN_SECRET="${ADMIN_TOKEN_SECRET:-}"
+SERPAPI_KEY_SECRET="${SERPAPI_KEY_SECRET:-}"
+
+SCHEDULER_INVOKER_SA="${SCHEDULER_INVOKER_SA:-}"
+SCHEDULER_PUBLIC="${SCHEDULER_PUBLIC:-true}"
+INGEST_CRON="${INGEST_CRON:-*/15 * * * *}"
+CHECK_PRICES_CRON="${CHECK_PRICES_CRON:-0 13 * * *}"
 
 if [[ -z "${PROJECT_ID}" ]]; then
   echo "PROJECT_ID is required."
@@ -88,12 +94,14 @@ build_secret_vars() {
     "${AMADEUS_CLIENT_SECRET_SECRET:+AMADEUS_CLIENT_SECRET=${AMADEUS_CLIENT_SECRET_SECRET}:latest}" \
     "${SENDGRID_API_KEY_SECRET:+SENDGRID_API_KEY=${SENDGRID_API_KEY_SECRET}:latest}" \
     "${SCHEDULER_TOKEN_SECRET:+SCHEDULER_TOKEN=${SCHEDULER_TOKEN_SECRET}:latest}" \
-    "${ADMIN_TOKEN_SECRET:+ADMIN_TOKEN=${ADMIN_TOKEN_SECRET}:latest}"
+    "${ADMIN_TOKEN_SECRET:+ADMIN_TOKEN=${ADMIN_TOKEN_SECRET}:latest}" \
+    "${SERPAPI_KEY_SECRET:+SERPAPI_KEY=${SERPAPI_KEY_SECRET}:latest}"
 }
 
 deploy_service() {
   local service_name="$1"
   local service_mode="$2"
+  local auth_flag="$3"
   local -a args
   args=(
     run deploy "$service_name"
@@ -101,9 +109,14 @@ deploy_service() {
     --region "$REGION"
     --image "$IMAGE_URI"
     --platform managed
-    --allow-unauthenticated
+    "$auth_flag"
     --set-env-vars "$(build_env_vars "$service_mode")"
   )
+
+  if [[ "$service_mode" == "scheduler" && "$SCHEDULER_PUBLIC" != "true" ]]; then
+    append_arg args --ingress
+    append_arg args "internal-and-cloud-load-balancing"
+  fi
 
   if [[ -n "$SERVICE_ACCOUNT_EMAIL" ]]; then
     append_arg args --service-account
@@ -126,19 +139,54 @@ echo "Building image ${IMAGE_URI}"
 gcloud builds submit "$ROOT_DIR" --project "$PROJECT_ID" --tag "$IMAGE_URI"
 
 echo "Deploying API service ${API_SERVICE}"
-deploy_service "$API_SERVICE" api
+deploy_service "$API_SERVICE" api --allow-unauthenticated
 
 echo "Deploying scheduler service ${SCHEDULER_SERVICE}"
-deploy_service "$SCHEDULER_SERVICE" scheduler
+if [[ "$SCHEDULER_PUBLIC" == "true" ]]; then
+  deploy_service "$SCHEDULER_SERVICE" scheduler --allow-unauthenticated
+else
+  deploy_service "$SCHEDULER_SERVICE" scheduler --no-allow-unauthenticated
+fi
 
-echo "API URL:"
-gcloud run services describe "$API_SERVICE" \
-  --project "$PROJECT_ID" \
-  --region "$REGION" \
-  --format='value(status.url)'
+API_URL="$(gcloud run services describe "$API_SERVICE" \
+  --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
+SCHEDULER_URL="$(gcloud run services describe "$SCHEDULER_SERVICE" \
+  --project "$PROJECT_ID" --region "$REGION" --format='value(status.url)')"
 
-echo "Scheduler URL:"
-gcloud run services describe "$SCHEDULER_SERVICE" \
-  --project "$PROJECT_ID" \
-  --region "$REGION" \
-  --format='value(status.url)'
+echo "API URL: $API_URL"
+echo "Scheduler URL: $SCHEDULER_URL"
+
+if [[ -n "$SCHEDULER_INVOKER_SA" ]]; then
+  echo "Granting run.invoker on scheduler to $SCHEDULER_INVOKER_SA"
+  gcloud run services add-iam-policy-binding "$SCHEDULER_SERVICE" \
+    --project "$PROJECT_ID" --region "$REGION" \
+    --member="serviceAccount:${SCHEDULER_INVOKER_SA}" \
+    --role="roles/run.invoker" >/dev/null
+
+  upsert_job() {
+    local name="$1" schedule="$2" path="$3"
+    if gcloud scheduler jobs describe "$name" --project "$PROJECT_ID" --location "$REGION" >/dev/null 2>&1; then
+      gcloud scheduler jobs update http "$name" \
+        --project "$PROJECT_ID" --location "$REGION" \
+        --schedule="$schedule" \
+        --uri="${SCHEDULER_URL}${path}" \
+        --http-method=POST \
+        --oidc-service-account-email="$SCHEDULER_INVOKER_SA" \
+        --oidc-token-audience="$SCHEDULER_URL"
+    else
+      gcloud scheduler jobs create http "$name" \
+        --project "$PROJECT_ID" --location "$REGION" \
+        --schedule="$schedule" \
+        --uri="${SCHEDULER_URL}${path}" \
+        --http-method=POST \
+        --oidc-service-account-email="$SCHEDULER_INVOKER_SA" \
+        --oidc-token-audience="$SCHEDULER_URL"
+    fi
+  }
+
+  upsert_job flightwatch-ingest       "$INGEST_CRON"        /internal/ingest
+  upsert_job flightwatch-check-prices "$CHECK_PRICES_CRON"  /check-prices
+else
+  echo "SCHEDULER_INVOKER_SA not set - skipping IAM binding and Cloud Scheduler job creation."
+  echo "Set it and re-run to wire up cron jobs."
+fi
