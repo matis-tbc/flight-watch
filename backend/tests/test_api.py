@@ -317,6 +317,8 @@ def test_unsubscribe_requires_valid_token(client):
 
 
 def test_unsubscribe_disables_notifications(client, monkeypatch):
+    from unsubscribe_tokens import build_unsubscribe_token
+
     called = {}
 
     def fake_disable_notifications(email):
@@ -326,16 +328,13 @@ def test_unsubscribe_disables_notifications(client, monkeypatch):
     monkeypatch.setenv("SCHEDULER_TOKEN", "test-secret")
     monkeypatch.setattr("app_simple_gcs.disable_notifications_for_email", fake_disable_notifications)
 
-    response = client.get("/api/search", params={
-        "origin": "JFK",
-        "destination": "LAX",
-        "departure_date": test_date,
-    })
+    email = "user@example.com"
+    token = build_unsubscribe_token(email)
+
+    response = client.get("/unsubscribe", params={"email": email, "token": token})
     assert response.status_code == 200
-    data = response.json()
-    assert data["source"] == "gcs"
-    assert len(data["flights"]) > 0
-    assert "date_note" not in data
+    assert called["email"] == email
+    assert "unsubscribed" in response.text.lower() or "no longer" in response.text.lower()
 
 
 def test_create_track(client, monkeypatch):
