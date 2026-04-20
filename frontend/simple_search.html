@@ -1813,7 +1813,6 @@
         const API_BASE = window.location.protocol === 'file:'
             ? 'http://localhost:8000/api'
             : '/api';
-        const TRACKING_EMAIL_STORAGE_KEY = 'flightwatch_tracking_email';
         let allAirports = [];
         let latestSearchData = null;
 
@@ -2168,7 +2167,7 @@
         });
 
         // --- Flight Tracking ---
-        let trackedAdminToken = sessionStorage.getItem('flightwatchAdminToken') || '';
+        let trackedAdminToken = '';
         let trackedAdminMode = false;
         let currentTrackedRoutes = [];
         let currentRouteAdminRoute = null;
@@ -2182,7 +2181,7 @@
             document.getElementById('track-route-display').textContent = `${origin} \u2192 ${destination} \u00b7 ${date}`;
             document.getElementById('track-modal-status').textContent = '';
             const modalEmailInput = document.getElementById('track-modal-email');
-            modalEmailInput.value = window.localStorage.getItem(TRACKING_EMAIL_STORAGE_KEY) || '';
+            modalEmailInput.value = '';
             document.getElementById('track-overlay').classList.add('active');
         }
 
@@ -2217,7 +2216,6 @@
                     const err = await resp.json().catch(() => ({}));
                     throw new Error(err.detail || `Error ${resp.status}`);
                 }
-                window.localStorage.setItem(TRACKING_EMAIL_STORAGE_KEY, email);
                 modalStatusEl.textContent = 'Flight tracked! You will be emailed on price drops.';
                 modalStatusEl.style.color = '#27ae60';
                 setTimeout(() => { closeTrackModal(); loadTrackedFlights(); }, 1200);
@@ -2237,7 +2235,6 @@
                 if (resp.status === 401 && trackedAdminToken) {
                     trackedAdminToken = '';
                     trackedAdminMode = false;
-                    sessionStorage.removeItem('flightwatchAdminToken');
                     updateTrackedAdminUi();
                     return loadTrackedFlights();
                 }
@@ -2393,7 +2390,6 @@
             if (trackedAdminMode) {
                 trackedAdminToken = '';
                 trackedAdminMode = false;
-                sessionStorage.removeItem('flightwatchAdminToken');
                 updateTrackedAdminUi();
                 await loadTrackedFlights();
                 return;
@@ -2423,12 +2419,10 @@
             }
 
             trackedAdminToken = token;
-            sessionStorage.setItem('flightwatchAdminToken', trackedAdminToken);
             await loadTrackedFlights();
             if (trackedAdminMode) {
                 closeAdminAuthModal();
             } else {
-                sessionStorage.removeItem('flightwatchAdminToken');
                 trackedAdminToken = '';
                 document.getElementById('admin-auth-status').textContent = 'Admin sign-in failed.';
                 document.getElementById('admin-auth-status').style.color = '#e74c3c';
@@ -2535,7 +2529,6 @@
                 if (resp.status === 401 && trackedAdminToken) {
                     trackedAdminToken = '';
                     trackedAdminMode = false;
-                    sessionStorage.removeItem('flightwatchAdminToken');
                     updateTrackedAdminUi();
                     throw new Error('Admin session expired. Please sign in again.');
                 }
@@ -2694,13 +2687,6 @@
                 copyEl.textContent = 'Enter your email and we’ll notify you if this route gets cheaper.';
             }
 
-            if (!emailInput.value.trim()) {
-                const savedEmail = window.localStorage.getItem(TRACKING_EMAIL_STORAGE_KEY) || '';
-                if (savedEmail) {
-                    emailInput.value = savedEmail;
-                }
-            }
-
             hideTrackStatus();
         }
 
@@ -2747,7 +2733,6 @@
                     throw new Error(data.detail || `Unable to create track (${response.status})`);
                 }
 
-                window.localStorage.setItem(TRACKING_EMAIL_STORAGE_KEY, userEmail);
                 showTrackStatus(data.message || 'Flight alert created.', 'success');
             } catch (error) {
                 showTrackStatus(error.message || 'Unable to create alert right now.', 'error');
@@ -2998,7 +2983,7 @@
             document.getElementById('metric-savings').textContent = formatCurrency(prediction.estimated_savings || 0);
             document.getElementById('metric-window').textContent = prediction.expected_dip_window || '—';
             document.getElementById('metric-current-sub').textContent = `Best current fare across ${payload.current_flights.length} results`;
-            document.getElementById('metric-predicted-sub').textContent = prediction.source_mode === 'model' ? 'Predicted by Python service' : 'Estimated fallback target';
+            document.getElementById('metric-predicted-sub').textContent = prediction.source_mode === 'model' ? 'Predicted by us' : 'Estimated fallback target';
             document.getElementById('metric-savings-sub').textContent = `≈ ${formatCurrency(totalSavings)} total for ${passengers} traveler${passengers > 1 ? 's' : ''}`;
             document.getElementById('metric-window-sub').textContent = payload.days_until_departure > 0
                 ? `${payload.days_until_departure} day${payload.days_until_departure === 1 ? '' : 's'} until departure`
