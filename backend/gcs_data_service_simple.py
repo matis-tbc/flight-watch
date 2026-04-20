@@ -21,6 +21,7 @@ class GCSDataServiceSimple:
         self.data_cache = None
         self.last_load_time = None
         self.column_names = []
+        self._baseline_cache = {}
         
     def is_configured(self) -> bool:
         return bool(self.bucket_name and self.file_path)
@@ -59,6 +60,7 @@ class GCSDataServiceSimple:
             
             self.data_cache = flight_data
             self.last_load_time = datetime.now()
+            self._baseline_cache = {}  # Clear stale baselines on data reload
             
             return flight_data
             
@@ -98,8 +100,18 @@ class GCSDataServiceSimple:
             filtered = [f for f in filtered if self._get_field(f, 'destination', 'dest_location', 'dest_code').upper() == destination]
         
         if departure_date:
-            filtered = [f for f in filtered if self._get_field(f, 'departure_datetime', 'departure_date', 'date', 'departure').startswith(departure_date)]
-        
+            exact = [f for f in filtered if self._get_field(f, 'departure_datetime', 'departure_date', 'date', 'departure').startswith(departure_date)]
+            if exact:
+                return exact[:limit]
+            # No exact date match: return closest available flights sorted by date proximity
+            def date_distance(flight):
+                dt_str = self._get_field(flight, 'departure_datetime', 'departure_date', 'date', 'departure')[:10]
+                try:
+                    return abs((datetime.strptime(dt_str, "%Y-%m-%d") - datetime.strptime(departure_date, "%Y-%m-%d")).days)
+                except (ValueError, TypeError):
+                    return 9999
+            return sorted(filtered, key=date_distance)[:limit]
+
         return filtered[:limit]
     
     def _extract_price(self, record: Dict[str, Any]):
@@ -175,10 +187,15 @@ class GCSDataServiceSimple:
 
     def _get_field(self, record: Dict[str, Any], *field_names: str) -> str:
         """get field with fallback names"""
+        normalized = {
+            str(k).strip().lower().replace('\ufeff', ''): v
+            for k, v in record.items()
+        }
         for field in field_names:
-            if field in record:
-                value = record[field]
-                return str(value) if value is not None else ""
+            key = field.strip().lower()
+            if key in normalized:
+                value = normalized[key]
+                return str(value).strip() if value is not None else ""
         return ""
     
     def get_available_origins(self) -> List[str]:
@@ -213,6 +230,73 @@ class GCSDataServiceSimple:
         
         return sorted(destinations)
     
+    # Instance-level cache, initialized in __init__ but also declared here for type hints
+
+    def get_route_baseline(self, origin: str, destination: str) -> Optional[Dict[str, Any]]:
+        """Compute price statistics for a route from cached GCS data.
+        Returns median, mean, p25, p75, min, max, sample_size or None if <3 flights."""
+        key = (origin.upper(), destination.upper())
+        if key in self._baseline_cache:
+            return self._baseline_cache[key]
+
+        if self.data_cache is None:
+            self.load_data_from_gcs()
+        if not self.data_cache:
+            self._baseline_cache[key] = None
+            return None
+
+        prices = []
+        for f in self.data_cache:
+            o = self._get_field(f, 'origin', 'origin_location', 'origin_code').upper()
+            d = self._get_field(f, 'destination', 'dest_location', 'dest_code').upper()
+            if o == key[0] and d == key[1]:
+                p = self._extract_price(f)
+                if p is not None and p > 0:
+                    prices.append(p)
+
+        if len(prices) < 3:
+            self._baseline_cache[key] = None
+            return None
+
+        prices.sort()
+        n = len(prices)
+        # Proper median: average of two middle values for even-length lists
+        if n % 2 == 0:
+            median = (prices[n // 2 - 1] + prices[n // 2]) / 2
+        else:
+            median = prices[n // 2]
+        result = {
+            "median": round(median, 2),
+            "mean": round(sum(prices) / n, 2),
+            "p25": prices[max(0, (n - 1) // 4)],
+            "p75": prices[min(n - 1, (3 * (n - 1)) // 4)],
+            "min": prices[0],
+            "max": prices[-1],
+            "sample_size": n,
+        }
+        self._baseline_cache[key] = result
+        return result
+
+    def get_date_range(self) -> Optional[Dict[str, Any]]:
+        """Return the earliest and latest departure dates in the dataset."""
+        if self.data_cache is None:
+            self.load_data_from_gcs()
+        if not self.data_cache:
+            return None
+        dates = []
+        for f in self.data_cache:
+            dt = self._get_field(f, 'departure_datetime', 'departure_date', 'date', 'departure')[:10]
+            if dt and len(dt) == 10:
+                dates.append(dt)
+        if not dates:
+            return None
+        dates.sort()
+        return {
+            "earliest_date": dates[0],
+            "latest_date": dates[-1],
+            "record_count": len(self.data_cache),
+        }
+
     def get_data_summary(self) -> Dict[str, Any]:
         """Get summary of GCS data"""
         if self.data_cache is None:

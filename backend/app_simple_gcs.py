@@ -11,12 +11,22 @@ import os
 import sys
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from firestore_logic import (
+    FirestoreConfigurationError,
+    disable_notifications_for_email,
+    delete_tracked_flight,
+    get_tracked_flights,
+    create_tracked_flight,
+    db,
+)
+from gcp_auth import resolve_google_application_credentials
+from date_utils import normalize_date_text
+from unsubscribe_tokens import is_valid_unsubscribe_token
+import uvicorn
 
 BASE_DIR = os.path.dirname(__file__)
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
-from gcp_auth import resolve_google_application_credentials
-from date_utils import normalize_date_text
 
 resolve_google_application_credentials()
 
@@ -64,14 +74,6 @@ app.add_middleware(
 )
 
 app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
-
-from firestore_logic import (
-    FirestoreConfigurationError,
-    delete_tracked_flight,
-    disable_notifications_for_email,
-    get_tracked_flights,
-)
-from unsubscribe_tokens import is_valid_unsubscribe_token
 
 
 @app.exception_handler(FirestoreConfigurationError)
@@ -331,6 +333,16 @@ async def suggest_airports(q: str = "", limit: int = 10):
         "total_matches": len(suggestions)
     }
 
+@app.get("/api/data-range")
+async def data_range():
+    """Return the date range of available flight data."""
+    if not check_gcs_configured():
+        return {"error": "GCS not configured", "earliest_date": None, "latest_date": None, "record_count": 0}
+    result = gcs_data_service_simple.get_date_range()
+    if not result:
+        return {"earliest_date": None, "latest_date": None, "record_count": 0}
+    return result
+
 @app.get("/api/search")
 async def search_flights(
     origin: str,
@@ -357,7 +369,6 @@ async def search_flights(
             )
             
             if flights:
-                priced_flights = _scale_flights_for_passengers(flights[:limit], passengers)
                 return {
                     "origin": origin,
                     "destination": destination,
@@ -370,6 +381,9 @@ async def search_flights(
                     "status": "success: gcs flight data",
                     "note": f"found {len(flights)} flights from gcs"
                 }
+                if date_note:
+                    result["date_note"] = date_note
+                return result
         except Exception as e:
             print(f"gcs search error: {e}")
     
@@ -476,8 +490,6 @@ async def create_track(
     The current price from GCS is fetched and stored as the baseline.
     When the scheduler runs and detects a lower price, it emails user_email.
     """
-    from firestore_logic import create_tracked_flight
-
     if not user_email:
         raise HTTPException(status_code=400, detail="user_email is required to receive price drop alerts.")
 
@@ -540,7 +552,6 @@ async def list_tracks():
 @app.get("/api/tracks/{track_id}")
 async def get_track(track_id: str):
     """Get a specific track by Firestore doc ID"""
-    from firestore_logic import db
     doc = db.collection("tracked_flights").document(track_id).get()
     if not doc.exists:
         raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
@@ -551,7 +562,6 @@ async def get_track(track_id: str):
 @app.delete("/api/tracks/{track_id}")
 async def delete_track(track_id: str):
     """Delete a track from Firestore"""
-    from firestore_logic import db
     doc = db.collection("tracked_flights").document(track_id).get()
     if not doc.exists:
         raise HTTPException(status_code=404, detail=f"Track {track_id} not found")
@@ -561,15 +571,16 @@ async def delete_track(track_id: str):
 @app.post("/api/predict")
 async def predict_price(payload: dict):
     """
-    Purchase guidance heuristic. Returns a recommendation (BUY NOW / WAIT / WATCH CLOSELY)
-    based on current prices, spread, volatility, and days until departure.
-    Will be replaced with a trained model later.
+    Purchase guidance using GCS route baselines when available,
+    falling back to a time-based heuristic.
     """
     best = float(payload.get("current_best_price") or 0)
     avg = float(payload.get("current_avg_price") or best)
     spread = float(payload.get("current_price_spread") or 0)
     volatility = float(payload.get("volatility_score") or 0)
     days = int(payload.get("days_until_departure") or 0)
+    origin = (payload.get("origin") or "").upper()
+    destination = (payload.get("destination") or "").upper()
 
     if best <= 0:
         return {
@@ -586,6 +597,27 @@ async def predict_price(payload: dict):
             "source_mode": "model",
         }
 
+    # Try to get route baseline from GCS data
+    baseline = None
+    buy_signal = None
+    pct_vs_baseline = None
+    if origin and destination:
+        baseline = gcs_data_service_simple.get_route_baseline(origin, destination)
+
+    if baseline:
+        median = baseline["median"]
+        pct_vs_baseline = round(((best - median) / median) * 100, 1) if median > 0 else 0
+
+        if pct_vs_baseline < -15:
+            buy_signal = "great_deal"
+        elif pct_vs_baseline < -5:
+            buy_signal = "good_price"
+        elif pct_vs_baseline <= 10:
+            buy_signal = "typical"
+        else:
+            buy_signal = "high"
+
+    # Time-based recommendation (enhanced with baseline when available)
     recommendation = "WATCH CLOSELY"
     confidence = 0.62
     savings_pct = 0.05
@@ -596,6 +628,21 @@ async def predict_price(payload: dict):
         confidence = 0.84
         savings_pct = 0.01
         rationale = "Departure is close, so the downside of waiting is higher than the likely savings from a short-lived dip."
+    elif buy_signal == "great_deal":
+        recommendation = "BUY NOW"
+        confidence = 0.88
+        savings_pct = 0.01
+        rationale = f"This fare is {abs(pct_vs_baseline):.0f}% below the historical median for this route. This is a great deal."
+    elif buy_signal == "good_price":
+        recommendation = "BUY NOW"
+        confidence = 0.74
+        savings_pct = 0.02
+        rationale = f"This fare is {abs(pct_vs_baseline):.0f}% below the historical median. A solid price worth locking in."
+    elif buy_signal == "high" and days >= 14:
+        recommendation = "WAIT"
+        confidence = 0.72
+        savings_pct = 0.10
+        rationale = f"This fare is {pct_vs_baseline:.0f}% above the historical median with time before departure. Prices on this route often come down."
     elif volatility >= 0.18 and days >= 14:
         recommendation = "WAIT"
         confidence = 0.76
@@ -615,19 +662,31 @@ async def predict_price(payload: dict):
     estimated_savings = max(0, round(min(spread * 0.45, avg * savings_pct)))
     predicted_lowest = max(0, round(best - estimated_savings))
 
-    return {
+    model_status = "gcs-baseline-v1" if baseline else "python-heuristic-v1"
+
+    result = {
         "recommendation": recommendation,
         "confidence": confidence,
         "predicted_lowest_price": predicted_lowest or best,
         "expected_dip_window": "Current fare is already attractive" if recommendation == "BUY NOW" else f"{days - 5} to {days} days out",
         "estimated_savings": estimated_savings,
         "rationale": rationale,
-        "model_status": "python-heuristic-v1",
-        "price_floor": best,
-        "price_ceiling": best + spread,
+        "model_status": model_status,
+        "price_floor": baseline["p25"] if baseline else best,
+        "price_ceiling": baseline["p75"] if baseline else (best + spread),
         "current_best_price": best,
         "source_mode": "model",
     }
+
+    if baseline:
+        result["historical_median"] = baseline["median"]
+        result["pct_vs_baseline"] = pct_vs_baseline
+        result["buy_signal"] = buy_signal
+        result["price_p25"] = baseline["p25"]
+        result["price_p75"] = baseline["p75"]
+        result["sample_size"] = baseline["sample_size"]
+
+    return result
 
 
 def format_flight_data(flight_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -686,14 +745,12 @@ def get_mock_flights(origin: str, destination: str, departure_date: Optional[str
         }
     ]
 
-if __name__ == "__main__":
-    import uvicorn
-    
+if __name__ == "__main__":    
     print("=" * 70)
     print("flightwatch api - gcs version")
     print("=" * 70)
     print(f"python: {sys.version.split()[0]}")
-    print(f"project: flightwatch-486618")
+    print("project: flightwatch-486618")
     print(f"gcs configured: {check_gcs_configured()}")
     print(f"amadeus configured: {check_amadeus_configured()}")
     
