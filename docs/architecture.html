@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>FlightWatch — System Architecture</title>
+<meta name="viewport" content="width=1700" />
+<style>
+  :root {
+    --indigo: #667eea;
+    --indigo-2: #5669d9;
+    --indigo-soft: #eef1fc;
+    --purple: #764ba2;
+    --ink: #1f2544;
+    --text: #2d3250;
+    --muted: #6b7391;
+    --dim: #9aa2bd;
+    --line: #e4e8f4;
+    --line-2: #eef1f8;
+    --panel: #ffffff;
+    --tint: #f6f7fd;
+    --amber: #e89b3f;
+    --amber-soft: #fdf2e3;
+    --violet: #8b5cf6;
+    --violet-soft: #f1ecff;
+    --green: #16a07a;
+    --green-soft: #e3f5ee;
+    --cyan:  #0aa0b8;
+    --cyan-soft: #e0f3f6;
+    --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  }
+  html, body {
+    margin: 0;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: var(--text);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    padding: 40px 0 60px;
+  }
+  .card {
+    width: 1640px;
+    max-width: calc(100vw - 40px);
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    padding: 36px 44px 40px;
+  }
+
+  header.head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 18px;
+    margin-bottom: 26px;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand-logo {
+    width: 42px; height: 42px;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 10px;
+    box-shadow: 0 6px 18px -6px rgba(102, 126, 234, 0.6);
+  }
+  .brand-logo svg { width: 24px; height: 24px; color: #fff; }
+  h1 { margin: 0; font-size: 22px; color: var(--ink); font-weight: 700; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 3px; }
+  .meta {
+    text-align: right; color: var(--muted); font-family: var(--mono); font-size: 11.5px; line-height: 1.8;
+  }
+  .meta b { color: var(--text); font-weight: 600; }
+
+  .section-title {
+    font-size: 11px; font-family: var(--mono); color: var(--indigo-2);
+    letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700;
+    margin: 6px 0 14px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .section-title::after {
+    content: ""; height: 1px; flex: 1; background: linear-gradient(90deg, var(--line), transparent);
+  }
+  .section-title .tag {
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    background: var(--indigo-soft);
+    color: var(--indigo-2);
+    letter-spacing: 0.08em;
+  }
+  .section-title .tag.amber { background: var(--amber-soft); color: #b87427; }
+  .section-title .tag.green { background: var(--green-soft); color: #0f7359; }
+  .section-title .tag.violet { background: var(--violet-soft); color: #6f3fef; }
+
+  .section-sub {
+    font-size: 12.5px; color: var(--muted); margin: -8px 0 16px; padding-left: 2px;
+  }
+
+  /* Inventory grid */
+  .inv {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  .inv .zone {
+    background: var(--tint);
+    border: 1px solid var(--line-2);
+    border-radius: 14px;
+    padding: 16px 18px 18px;
+  }
+  .inv .zlabel {
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--indigo-2);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .inv .zlabel .dot {
+    width: 6px; height: 6px; border-radius: 999px; background: var(--indigo);
+  }
+  .inv .items { display: grid; gap: 10px; }
+  .inv .comp {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 11px 13px;
+    display: flex; align-items: center; gap: 11px;
+    box-shadow: 0 2px 6px -3px rgba(102,126,234,0.15);
+  }
+  .inv .comp .ico {
+    width: 28px; height: 28px; flex: 0 0 auto;
+    border-radius: 7px;
+    display: grid; place-items: center;
+    background: var(--indigo-soft);
+    color: var(--indigo-2);
+  }
+  .inv .comp .ico svg { width: 15px; height: 15px; }
+  .inv .comp.amber .ico  { background: var(--amber-soft);  color: #b87427; }
+  .inv .comp.violet .ico { background: var(--violet-soft); color: #6f3fef; }
+  .inv .comp.green .ico  { background: var(--green-soft);  color: #0f7359; }
+  .inv .comp.cyan .ico   { background: var(--cyan-soft);   color: #07778a; }
+  .inv .comp.gray .ico   { background: #eef0f6;            color: var(--muted); }
+  .inv .comp h4 { margin: 0; font-size: 13px; color: var(--ink); font-weight: 600; }
+  .inv .comp p  { margin: 2px 0 0 0; font-size: 11px; color: var(--muted); font-family: var(--mono); line-height: 1.3; }
+
+  /* Flow rows */
+  .flow {
+    background: var(--tint);
+    border: 1px solid var(--line-2);
+    border-radius: 14px;
+    padding: 26px 28px;
+    margin-bottom: 18px;
+  }
+  .flow.user  { background: linear-gradient(180deg, #fcfdff, #f3f5fe); }
+  .flow.amber { background: linear-gradient(180deg, #fffbf4, #fbf1df); border-color: #f2e1c4; }
+  .flow.green { background: linear-gradient(180deg, #f4fbf8, #e7f4ee); border-color: #c7e7d8; }
+  .flow svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+  .foot {
+    margin-top: 8px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+  }
+  .foot .cell {
+    padding: 16px 18px;
+    background: var(--tint);
+    border: 1px solid var(--line-2);
+    border-radius: 12px;
+  }
+  .foot h4 {
+    margin: 0 0 8px 0;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--indigo-2);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .foot p { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--text); }
+  .foot p b { color: var(--ink); }
+  .foot .cell.amber h4 { color: #b87427; }
+  .foot .cell.green h4 { color: #0f7359; }
+
+  /* SVG atoms */
+  .fnode rect { fill: #fff; stroke: var(--line); rx: 12; ry: 12; }
+  .fnode .ttl { fill: var(--ink); font-size: 14px; font-weight: 700; font-family: var(--sans); }
+  .fnode .sub { fill: var(--muted); font-size: 11px; font-family: var(--mono); }
+  .fnode .item { fill: var(--text); font-size: 11px; font-family: var(--mono); }
+  .fnode .dim  { fill: var(--dim); font-size: 11px; font-family: var(--mono); }
+  .step {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.04em; font-weight: 700;
+    fill: var(--indigo);
+  }
+  .elabel {
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+  }
+  .edge { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  @media print {
+    body { background: white; padding: 0; }
+    .card { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <header class="head">
+      <div class="brand">
+        <div class="brand-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-0.5-3 0-4.5 1.5L13 8 4.8 6.2c-0.5-0.1-0.9.1-1.1.5l-0.3 0.5c-0.2.5-0.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-0.2c.4-0.3.6-0.7.5-1.2z"/>
+          </svg>
+        </div>
+        <div>
+          <h1>FlightWatch &mdash; System Architecture</h1>
+          <div class="sub">Price tracking, drop detection, and email alerts on Google Cloud</div>
+        </div>
+      </div>
+      <div class="meta">
+        <div><b>Project</b>  flightwatch-486618</div>
+        <div><b>Runtime</b>  Cloud Run &middot; Python 3.13</div>
+        <div><b>Services</b>  FastAPI (api) + Flask (scheduler)</div>
+      </div>
+    </header>
+
+    <!-- ============ COMPONENT INVENTORY ============ -->
+    <div class="section-title">Components</div>
+    <div class="section-sub">Grouped by zone. Edges are shown in the three flow diagrams below.</div>
+
+    <div class="inv" style="margin-bottom: 36px;">
+      <!-- CLIENT -->
+      <div class="zone">
+        <div class="zlabel"><span class="dot"></span>Client</div>
+        <div class="items">
+          <div class="comp">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 20h8M12 18v2"/></svg>
+            </div>
+            <div>
+              <h4>Browser</h4>
+              <p>end user &middot; fetch, Leaflet</p>
+            </div>
+          </div>
+          <div class="comp violet">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 8h16M7 12h6M7 16h10"/></svg>
+            </div>
+            <div>
+              <h4>simple_search.html</h4>
+              <p>single-file SPA &middot; 2k LOC</p>
+            </div>
+          </div>
+          <div class="comp green">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+            </div>
+            <div>
+              <h4>User Inbox</h4>
+              <p>price drop alerts</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- COMPUTE -->
+      <div class="zone">
+        <div class="zlabel"><span class="dot"></span>Google Cloud Run &middot; Compute</div>
+        <div class="items">
+          <div class="comp">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+            </div>
+            <div>
+              <h4>flightwatch-api</h4>
+              <p>FastAPI &middot; 13 routes</p>
+            </div>
+          </div>
+          <div class="comp violet">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </div>
+            <div>
+              <h4>flightwatch-scheduler</h4>
+              <p>Flask &middot; ingest + alert</p>
+            </div>
+          </div>
+          <div class="comp violet">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M4 9h16M9 3v4M15 3v4"/></svg>
+            </div>
+            <div>
+              <h4>Cloud Scheduler</h4>
+              <p>cron &middot; 15m &amp; daily</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DATA -->
+      <div class="zone">
+        <div class="zlabel"><span class="dot"></span>GCP &middot; Managed Data</div>
+        <div class="items">
+          <div class="comp cyan">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l3-4h12l3 4v10a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/><path d="M3 8h18M9 13h6"/></svg>
+            </div>
+            <div>
+              <h4>Cloud Storage (GCS)</h4>
+              <p>flight_data.csv + raw JSON</p>
+            </div>
+          </div>
+          <div class="comp cyan">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>
+            </div>
+            <div>
+              <h4>Firestore</h4>
+              <p>tracked_flights &middot; routes &middot; log</p>
+            </div>
+          </div>
+          <div class="comp gray">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+            </div>
+            <div>
+              <h4>Secret Manager</h4>
+              <p>Amadeus &middot; SendGrid &middot; token</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EXTERNAL -->
+      <div class="zone">
+        <div class="zlabel"><span class="dot"></span>External Services</div>
+        <div class="items">
+          <div class="comp amber">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10l-5-3-6 4-6-2v10l6 2 6-4 5 3V10z"/></svg>
+            </div>
+            <div>
+              <h4>Amadeus API</h4>
+              <p>live flight fares</p>
+            </div>
+          </div>
+          <div class="comp green">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l9 6 9-6M3 6v12h18V6"/></svg>
+            </div>
+            <div>
+              <h4>SendGrid</h4>
+              <p>transactional email</p>
+            </div>
+          </div>
+          <div class="comp gray">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 3 4 6 4 9s-1.5 6-4 9c-2.5-3-4-6-4-9s1.5-6 4-9z"/></svg>
+            </div>
+            <div>
+              <h4>Google Flights / Leaflet</h4>
+              <p>booking link &middot; map tiles</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ FLOW 1: USER ============ -->
+    <div class="section-title">
+      <span>Flow 1 &mdash; user search &amp; track</span>
+      <span class="tag">on-demand &middot; HTTPS</span>
+    </div>
+    <div class="section-sub">Browser hits the API; the API reads from GCS for search results and Firestore for tracked flights.</div>
+
+    <div class="flow user">
+      <svg viewBox="0 0 1500 260" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="a-user" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#667eea"/></marker>
+          <marker id="a-usercy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0aa0b8"/></marker>
+        </defs>
+
+        <!-- Browser -->
+        <g class="fnode">
+          <rect x="20" y="60" width="240" height="140"/>
+          <rect x="20" y="60" width="4" height="140" fill="#667eea" rx="2"/>
+          <text class="ttl"  x="42" y="92">Browser</text>
+          <text class="sub"  x="42" y="112">end user</text>
+          <text class="item" x="42" y="142">search form</text>
+          <text class="item" x="42" y="162">explore map</text>
+          <text class="item" x="42" y="182">tracks list</text>
+          <text class="step" x="42" y="40">1. USER</text>
+        </g>
+
+        <!-- flightwatch-api -->
+        <g class="fnode">
+          <rect x="460" y="40" width="320" height="180"/>
+          <rect x="460" y="40" width="4" height="180" fill="#667eea" rx="2"/>
+          <text class="ttl"  x="482" y="72">flightwatch-api</text>
+          <text class="sub"  x="482" y="92">FastAPI &middot; app_simple_gcs.py</text>
+          <text class="item" x="482" y="120">GET  /api/search</text>
+          <text class="item" x="482" y="138">GET  /api/explore</text>
+          <text class="item" x="482" y="156">POST /api/tracks</text>
+          <text class="item" x="482" y="174">GET  /api/tracks</text>
+          <text class="item" x="482" y="192">POST /api/predict</text>
+          <text class="dim"  x="482" y="212">+ /frontend static &middot; /health</text>
+          <text class="step" x="482" y="20">2. API</text>
+        </g>
+
+        <!-- GCS -->
+        <g class="fnode">
+          <rect x="980" y="40" width="240" height="90"/>
+          <rect x="980" y="40" width="4" height="90" fill="#0aa0b8" rx="2"/>
+          <text class="ttl"  x="1002" y="72">Cloud Storage</text>
+          <text class="sub"  x="1002" y="92">flight_data.csv</text>
+          <text class="dim"  x="1002" y="112">search, explore, baselines</text>
+          <text class="step" x="1002" y="20">3a. READ</text>
+        </g>
+
+        <!-- Firestore -->
+        <g class="fnode">
+          <rect x="980" y="150" width="240" height="90"/>
+          <rect x="980" y="150" width="4" height="90" fill="#0aa0b8" rx="2"/>
+          <text class="ttl"  x="1002" y="182">Firestore</text>
+          <text class="sub"  x="1002" y="202">tracked_flights</text>
+          <text class="dim"  x="1002" y="222">CRUD for /api/tracks</text>
+          <text class="step" x="1002" y="140">3b. CRUD</text>
+        </g>
+
+        <!-- Edges -->
+        <!-- Browser -> api -->
+        <path class="edge" stroke="#667eea" marker-end="url(#a-user)"
+              d="M 260,120 L 460,120"/>
+        <rect x="298" y="98" width="124" height="16" rx="4" fill="#fff" stroke="#e4e8f4"/>
+        <text class="elabel" fill="#667eea" x="306" y="110">HTTPS  /api/*</text>
+
+        <!-- api -> Browser (response) -->
+        <path class="edge" stroke="#667eea" marker-end="url(#a-user)"
+              d="M 460,160 L 260,160"/>
+        <rect x="296" y="166" width="128" height="16" rx="4" fill="#fff" stroke="#e4e8f4"/>
+        <text class="elabel" fill="#667eea" x="304" y="178">JSON + /frontend</text>
+
+        <!-- api -> GCS -->
+        <path class="edge" stroke="#0aa0b8" marker-end="url(#a-usercy)"
+              d="M 780,85 L 980,85"/>
+        <rect x="826" y="63" width="108" height="16" rx="4" fill="#fff" stroke="#e4e8f4"/>
+        <text class="elabel" fill="#0aa0b8" x="834" y="75">read CSV rows</text>
+
+        <!-- api -> Firestore -->
+        <path class="edge" stroke="#0aa0b8" marker-end="url(#a-usercy)"
+              d="M 780,195 L 980,195"/>
+        <rect x="826" y="173" width="108" height="16" rx="4" fill="#fff" stroke="#e4e8f4"/>
+        <text class="elabel" fill="#0aa0b8" x="834" y="185">tracks CRUD</text>
+      </svg>
+    </div>
+
+    <!-- ============ FLOW 2: INGEST ============ -->
+    <div class="section-title">
+      <span>Flow 2 &mdash; live ingest</span>
+      <span class="tag amber">every 15m</span>
+    </div>
+    <div class="section-sub">Cloud Scheduler fires the scheduler service, which fetches fresh Amadeus fares and writes them to GCS + Firestore.</div>
+
+    <div class="flow amber">
+      <svg viewBox="0 0 1500 240" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="a-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8b5cf6"/></marker>
+          <marker id="a-amber"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#e89b3f"/></marker>
+          <marker id="a-cyan"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0aa0b8"/></marker>
+        </defs>
+
+        <!-- Cloud Scheduler -->
+        <g class="fnode">
+          <rect x="20" y="50" width="220" height="140"/>
+          <rect x="20" y="50" width="4" height="140" fill="#8b5cf6" rx="2"/>
+          <text class="ttl"  x="42" y="82">Cloud Scheduler</text>
+          <text class="sub"  x="42" y="102">GCP cron</text>
+          <text class="item" x="42" y="130">every 15m</text>
+          <text class="dim"  x="42" y="150">&rarr; /internal/ingest</text>
+          <text class="dim"  x="42" y="172">OIDC + token header</text>
+          <text class="step" x="42" y="30" fill="#8b5cf6">1. CRON</text>
+        </g>
+
+        <!-- scheduler -->
+        <g class="fnode">
+          <rect x="330" y="30" width="300" height="180"/>
+          <rect x="330" y="30" width="4" height="180" fill="#8b5cf6" rx="2"/>
+          <text class="ttl"  x="352" y="62">flightwatch-scheduler</text>
+          <text class="sub"  x="352" y="82">Flask &middot; scheduler.py</text>
+          <text class="item" x="352" y="112">POST /internal/ingest</text>
+          <text class="dim"  x="352" y="132">&bull; fetch fresh fares</text>
+          <text class="dim"  x="352" y="150">&bull; archive raw JSON</text>
+          <text class="dim"  x="352" y="168">&bull; upsert routes doc</text>
+          <text class="dim"  x="352" y="194">header: X-Scheduler-Token</text>
+          <text class="step" x="352" y="20" fill="#8b5cf6">2. SERVICE</text>
+        </g>
+
+        <!-- Amadeus -->
+        <g class="fnode">
+          <rect x="720" y="30" width="240" height="100"/>
+          <rect x="720" y="30" width="4" height="100" fill="#e89b3f" rx="2"/>
+          <text class="ttl"  x="742" y="62">Amadeus API</text>
+          <text class="sub"  x="742" y="82">live flight fares</text>
+          <text class="dim"  x="742" y="102">OAuth2 &middot; flight-offers</text>
+          <text class="dim"  x="742" y="120">rate-limited quota</text>
+          <text class="step" x="742" y="20" fill="#e89b3f">3. FETCH</text>
+        </g>
+
+        <!-- GCS (raw) -->
+        <g class="fnode">
+          <rect x="1050" y="30" width="240" height="90"/>
+          <rect x="1050" y="30" width="4" height="90" fill="#0aa0b8" rx="2"/>
+          <text class="ttl"  x="1072" y="62">Cloud Storage</text>
+          <text class="sub"  x="1072" y="82">INGEST_RAW_BUCKET</text>
+          <text class="dim"  x="1072" y="102">raw Amadeus JSON</text>
+          <text class="step" x="1072" y="20" fill="#0aa0b8">4a. ARCHIVE</text>
+        </g>
+
+        <!-- Firestore routes -->
+        <g class="fnode">
+          <rect x="1050" y="140" width="240" height="90"/>
+          <rect x="1050" y="140" width="4" height="90" fill="#0aa0b8" rx="2"/>
+          <text class="ttl"  x="1072" y="172">Firestore</text>
+          <text class="sub"  x="1072" y="192">routes + /history</text>
+          <text class="dim"  x="1072" y="212">per-route snapshot</text>
+          <text class="step" x="1072" y="132" fill="#0aa0b8">4b. UPSERT</text>
+        </g>
+
+        <!-- Edges -->
+        <path class="edge" stroke="#8b5cf6" stroke-dasharray="6 5" marker-end="url(#a-violet)"
+              d="M 240,120 L 330,120"/>
+        <rect x="246" y="100" width="78" height="16" rx="4" fill="#fffbf4" stroke="#f2e1c4"/>
+        <text class="elabel" fill="#8b5cf6" x="254" y="112">HTTPS POST</text>
+
+        <path class="edge" stroke="#e89b3f" marker-end="url(#a-amber)"
+              d="M 630,80 L 720,80"/>
+        <rect x="636" y="60" width="76" height="16" rx="4" fill="#fffbf4" stroke="#f2e1c4"/>
+        <text class="elabel" fill="#e89b3f" x="644" y="72">flight-offers</text>
+
+        <!-- scheduler -> GCS (raw) -->
+        <path class="edge" stroke="#0aa0b8" marker-end="url(#a-cyan)"
+              d="M 630,130 L 840,130 L 840,75 L 1050,75"/>
+        <rect x="864" y="57" width="96" height="16" rx="4" fill="#fffbf4" stroke="#f2e1c4"/>
+        <text class="elabel" fill="#0aa0b8" x="872" y="69">raw JSON write</text>
+
+        <!-- scheduler -> Firestore (routes) -->
+        <path class="edge" stroke="#0aa0b8" marker-end="url(#a-cyan)"
+              d="M 630,175 L 840,175 L 840,185 L 1050,185"/>
+        <rect x="864" y="163" width="96" height="16" rx="4" fill="#fffbf4" stroke="#f2e1c4"/>
+        <text class="elabel" fill="#0aa0b8" x="872" y="175">upsert routes</text>
+      </svg>
+    </div>
+
+    <!-- ============ FLOW 3: ALERT ============ -->
+    <div class="section-title">
+      <span>Flow 3 &mdash; drop detection &amp; email alert</span>
+      <span class="tag green">daily &middot; 08:00</span>
+    </div>
+    <div class="section-sub">Scheduler reads each tracked flight, pulls current price from GCS, compares to baseline, and emails on drop (dedup 24h in Firestore notification_log).</div>
+
+    <div class="flow green">
+      <svg viewBox="0 0 1500 250" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="b-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#8b5cf6"/></marker>
+          <marker id="b-cyan"   viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0aa0b8"/></marker>
+          <marker id="b-green"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#16a07a"/></marker>
+          <marker id="b-indigo" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#667eea"/></marker>
+        </defs>
+
+        <!-- Cloud Scheduler -->
+        <g class="fnode">
+          <rect x="20" y="75" width="170" height="100"/>
+          <rect x="20" y="75" width="4" height="100" fill="#8b5cf6" rx="2"/>
+          <text class="ttl"  x="42" y="107">Cloud Scheduler</text>
+          <text class="sub"  x="42" y="127">daily 08:00</text>
+          <text class="dim"  x="42" y="149">&rarr; /check-prices</text>
+          <text class="step" x="42" y="55" fill="#8b5cf6">1</text>
+        </g>
+
+        <!-- scheduler -->
+        <g class="fnode">
+          <rect x="270" y="40" width="260" height="170"/>
+          <rect x="270" y="40" width="4" height="170" fill="#8b5cf6" rx="2"/>
+          <text class="ttl"  x="292" y="72">scheduler</text>
+          <text class="sub"  x="292" y="92">POST /check-prices</text>
+          <text class="item" x="292" y="120">for each tracked flight:</text>
+          <text class="dim"  x="292" y="140">&bull; fetch latest price</text>
+          <text class="dim"  x="292" y="158">&bull; compare vs baseline</text>
+          <text class="dim"  x="292" y="176">&bull; check dedup log</text>
+          <text class="dim"  x="292" y="194">&bull; trigger email on drop</text>
+          <text class="step" x="292" y="30" fill="#8b5cf6">2</text>
+        </g>
+
+        <!-- Firestore tracks -->
+        <g class="fnode">
+          <rect x="600" y="30" width="220" height="90"/>
+          <rect x="600" y="30" width="4" height="90" fill="#0aa0b8" rx="2"/>
+          <text class="ttl"  x="622" y="62">Firestore</text>
+          <text class="sub"  x="622" y="82">tracked_flights</text>
+          <text class="dim"  x="622" y="102">user, route, last_price</text>
+          <text class="step" x="622" y="20" fill="#0aa0b8">3a</text>
+        </g>
+
+        <!-- GCS baseline -->
+        <g class="fnode">
+          <rect x="600" y="135" width="220" height="80"/>
+          <rect x="600" y="135" width="4" height="80" fill="#0aa0b8" rx="2"/>
+          <text class="ttl"  x="622" y="167">Cloud Storage</text>
+          <text class="sub"  x="622" y="187">flight_data.csv</text>
+          <text class="dim"  x="622" y="207">baseline + latest price</text>
+          <text class="step" x="622" y="125" fill="#0aa0b8">3b</text>
+        </g>
+
+        <!-- SendGrid -->
+        <g class="fnode">
+          <rect x="900" y="30" width="200" height="90"/>
+          <rect x="900" y="30" width="4" height="90" fill="#16a07a" rx="2"/>
+          <text class="ttl"  x="922" y="62">SendGrid</text>
+          <text class="sub"  x="922" y="82">drop alert template</text>
+          <text class="dim"  x="922" y="102">FROM_EMAIL sender</text>
+          <text class="step" x="922" y="20" fill="#16a07a">4</text>
+        </g>
+
+        <!-- Firestore notification_log -->
+        <g class="fnode">
+          <rect x="900" y="135" width="200" height="80"/>
+          <rect x="900" y="135" width="4" height="80" fill="#0aa0b8" rx="2"/>
+          <text class="ttl"  x="922" y="167">Firestore</text>
+          <text class="sub"  x="922" y="187">notification_log</text>
+          <text class="dim"  x="922" y="207">24h dedup</text>
+          <text class="step" x="922" y="125" fill="#0aa0b8">4b</text>
+        </g>
+
+        <!-- User Inbox -->
+        <g class="fnode">
+          <rect x="1180" y="30" width="200" height="90"/>
+          <rect x="1180" y="30" width="4" height="90" fill="#16a07a" rx="2"/>
+          <text class="ttl"  x="1202" y="62">User Inbox</text>
+          <text class="sub"  x="1202" y="82">price drop alert</text>
+          <text class="dim"  x="1202" y="102">old &rarr; new &middot; Book Now</text>
+          <text class="step" x="1202" y="20" fill="#16a07a">5</text>
+        </g>
+
+        <!-- Google Flights -->
+        <g class="fnode">
+          <rect x="1180" y="135" width="200" height="80"/>
+          <rect x="1180" y="135" width="4" height="80" fill="#9aa2bd" rx="2"/>
+          <text class="ttl"  x="1202" y="167">Google Flights</text>
+          <text class="sub"  x="1202" y="187">booking deep link</text>
+          <text class="dim"  x="1202" y="207">opened by user</text>
+          <text class="step" x="1202" y="125" fill="#9aa2bd">6</text>
+        </g>
+
+        <!-- Edges -->
+        <path class="edge" stroke="#8b5cf6" stroke-dasharray="6 5" marker-end="url(#b-violet)"
+              d="M 190,125 L 270,125"/>
+        <rect x="196" y="107" width="66" height="16" rx="4" fill="#f4fbf8" stroke="#c7e7d8"/>
+        <text class="elabel" fill="#8b5cf6" x="204" y="119">cron POST</text>
+
+        <!-- scheduler -> Firestore tracks -->
+        <path class="edge" stroke="#0aa0b8" marker-end="url(#b-cyan)"
+              d="M 530,80 L 600,80"/>
+        <rect x="536" y="60" width="62" height="16" rx="4" fill="#f4fbf8" stroke="#c7e7d8"/>
+        <text class="elabel" fill="#0aa0b8" x="544" y="72">list tracks</text>
+
+        <!-- scheduler -> GCS -->
+        <path class="edge" stroke="#0aa0b8" marker-end="url(#b-cyan)"
+              d="M 530,175 L 600,175"/>
+        <rect x="536" y="155" width="62" height="16" rx="4" fill="#f4fbf8" stroke="#c7e7d8"/>
+        <text class="elabel" fill="#0aa0b8" x="544" y="167">read price</text>
+
+        <!-- Firestore tracks -> SendGrid (drop → send) -->
+        <path class="edge" stroke="#16a07a" marker-end="url(#b-green)"
+              d="M 820,75 L 900,75"/>
+        <rect x="826" y="55" width="74" height="16" rx="4" fill="#f4fbf8" stroke="#c7e7d8"/>
+        <text class="elabel" fill="#16a07a" x="834" y="67">drop detected</text>
+
+        <!-- SendGrid -> Firestore log -->
+        <path class="edge" stroke="#0aa0b8" marker-end="url(#b-cyan)"
+              d="M 1000,120 L 1000,135"/>
+        <rect x="1008" y="120" width="48" height="16" rx="4" fill="#f4fbf8" stroke="#c7e7d8"/>
+        <text class="elabel" fill="#0aa0b8" x="1014" y="132">log send</text>
+
+        <!-- SendGrid -> Inbox -->
+        <path class="edge" stroke="#16a07a" marker-end="url(#b-green)"
+              d="M 1100,75 L 1180,75"/>
+        <rect x="1106" y="55" width="72" height="16" rx="4" fill="#f4fbf8" stroke="#c7e7d8"/>
+        <text class="elabel" fill="#16a07a" x="1114" y="67">email sent</text>
+
+        <!-- Inbox -> Google Flights -->
+        <path class="edge" stroke="#667eea" marker-end="url(#b-indigo)"
+              d="M 1280,120 L 1280,135"/>
+        <rect x="1288" y="120" width="82" height="16" rx="4" fill="#f4fbf8" stroke="#c7e7d8"/>
+        <text class="elabel" fill="#667eea" x="1296" y="132">Book Now link</text>
+      </svg>
+    </div>
+
+    <!-- ============ FOOT SUMMARY ============ -->
+    <div class="foot">
+      <div class="cell">
+        <h4>Cross-cutting &mdash; Secrets</h4>
+        <p>Both Cloud Run services mount <b>AMADEUS_CLIENT_ID/SECRET</b>, <b>SENDGRID_API_KEY</b>, and <b>SCHEDULER_TOKEN</b> from GCP Secret Manager at startup.</p>
+      </div>
+      <div class="cell amber">
+        <h4>Cross-cutting &mdash; Deploy</h4>
+        <p>Single Dockerfile &rarr; Cloud Build &rarr; Artifact Registry. Two Cloud Run services share the image; <b>SERVICE_MODE</b> env var selects api vs scheduler entrypoint.</p>
+      </div>
+      <div class="cell green">
+        <h4>Cross-cutting &mdash; Seeding</h4>
+        <p><b>scripts/model_pipeline</b> (offline) pulls Amadeus + BTS DB1B, builds baselines, and writes <b>flight_data.csv</b> to GCS. <b>scripts/flight_fetch*</b> backs this up with SerpAPI.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
