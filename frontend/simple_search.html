@@ -1714,12 +1714,12 @@
         <div class="track-modal">
             <h3>Track Price Drops</h3>
             <div class="track-route" id="track-route-display"></div>
-            <input type="email" id="track-email" placeholder="Your email for alerts">
+            <input type="email" id="track-modal-email" placeholder="Your email for alerts">
             <div class="track-modal-actions">
                 <button class="track-cancel-btn" onclick="closeTrackModal()">Cancel</button>
                 <button class="track-submit-btn" id="track-submit-btn" onclick="submitTrack()">Start Tracking</button>
             </div>
-            <div class="track-status" id="track-status"></div>
+            <div class="track-status" id="track-modal-status"></div>
         </div>
     </div>
 
@@ -2180,8 +2180,9 @@
             _trackDate = date;
             _trackPrice = price;
             document.getElementById('track-route-display').textContent = `${origin} \u2192 ${destination} \u00b7 ${date}`;
-            document.getElementById('track-status').textContent = '';
-            document.getElementById('track-email').value = '';
+            document.getElementById('track-modal-status').textContent = '';
+            const modalEmailInput = document.getElementById('track-modal-email');
+            modalEmailInput.value = window.localStorage.getItem(TRACKING_EMAIL_STORAGE_KEY) || '';
             document.getElementById('track-overlay').classList.add('active');
         }
 
@@ -2190,16 +2191,17 @@
         }
 
         async function submitTrack() {
-            const email = document.getElementById('track-email').value.trim();
+            const email = document.getElementById('track-modal-email').value.trim().toLowerCase();
+            const modalStatusEl = document.getElementById('track-modal-status');
             if (!email || !email.includes('@')) {
-                document.getElementById('track-status').textContent = 'Please enter a valid email.';
-                document.getElementById('track-status').style.color = '#e74c3c';
+                modalStatusEl.textContent = 'Please enter a valid email.';
+                modalStatusEl.style.color = '#e74c3c';
                 return;
             }
             const btn = document.getElementById('track-submit-btn');
             btn.disabled = true;
             btn.textContent = 'Saving...';
-            document.getElementById('track-status').textContent = '';
+            modalStatusEl.textContent = '';
 
             try {
                 const passengers = document.getElementById('passengers').value || '1';
@@ -2215,12 +2217,13 @@
                     const err = await resp.json().catch(() => ({}));
                     throw new Error(err.detail || `Error ${resp.status}`);
                 }
-                document.getElementById('track-status').textContent = 'Flight tracked! You will be emailed on price drops.';
-                document.getElementById('track-status').style.color = '#27ae60';
+                window.localStorage.setItem(TRACKING_EMAIL_STORAGE_KEY, email);
+                modalStatusEl.textContent = 'Flight tracked! You will be emailed on price drops.';
+                modalStatusEl.style.color = '#27ae60';
                 setTimeout(() => { closeTrackModal(); loadTrackedFlights(); }, 1200);
             } catch (e) {
-                document.getElementById('track-status').textContent = e.message;
-                document.getElementById('track-status').style.color = '#e74c3c';
+                modalStatusEl.textContent = e.message;
+                modalStatusEl.style.color = '#e74c3c';
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Start Tracking';
@@ -2434,6 +2437,8 @@
 
         async function openRouteAdminModal(origin, destination, departureDate, trackIds = '') {
             currentRouteAdminRoute = { origin, destination, departureDate, trackIds };
+            const travelerText = '';
+            document.getElementById('route-admin-subtitle').textContent = `${origin} → ${destination} · Departs ${formatTrackedDate(departureDate)} · ${travelerText}`;
             document.getElementById('route-admin-subtitle').textContent = `${origin} → ${destination} · Departs ${formatTrackedDate(departureDate)}`;
             document.getElementById('route-admin-status').textContent = '';
             document.getElementById('route-admin-overlay').classList.add('active');
@@ -2621,8 +2626,10 @@
                     };
                     showStatus(`Found ${data.flights.length} flights`, 'success');
                     displayFlights(latestSearchData);
+                    updateTrackPanel(latestSearchData);
                     await runPurchaseGuidance(latestSearchData);
                 } else {
+                    latestSearchData = null;
                     showStatus('No flights found for this route', 'error');
                     clearResults();
                     hideAdvisor('No flight data available for price guidance.');
@@ -2722,7 +2729,8 @@
                 origin: latestSearchData.origin,
                 destination: latestSearchData.destination,
                 departure_date: latestSearchData.departure_date,
-                user_email: userEmail
+                user_email: userEmail,
+                passengers: String(latestSearchData.passengers || document.getElementById('passengers').value || 1)
             });
 
             trackButton.disabled = true;
@@ -3149,6 +3157,7 @@
         }
 
         function clearResults() {
+            latestSearchData = null;
             document.getElementById('track-panel').style.display = 'none';
             hideTrackStatus();
             document.getElementById('flights-container').innerHTML = `

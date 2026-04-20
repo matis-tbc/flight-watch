@@ -337,6 +337,32 @@ def test_create_track(client, monkeypatch):
     assert captured["adults"] == 2
 
 
+def test_create_track_without_gcs_still_succeeds(client, monkeypatch):
+    captured = {}
+
+    def fake_create_tracked_flight(**kwargs):
+        captured.update(kwargs)
+        return "fake-doc-id"
+
+    monkeypatch.setattr(app_simple_gcs, "check_gcs_configured", lambda: False)
+    monkeypatch.setattr(firestore_logic, "create_tracked_flight", fake_create_tracked_flight)
+    if hasattr(app_simple_gcs, "create_tracked_flight"):
+        monkeypatch.setattr(app_simple_gcs, "create_tracked_flight", fake_create_tracked_flight)
+
+    response = client.post("/api/tracks", params={
+        "origin": "JFK",
+        "destination": "ORD",
+        "departure_date": "2026-04-15",
+        "user_email": "test@example.com",
+    })
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["doc_id"] == "fake-doc-id"
+    assert data["baseline_price"] is None
+    assert captured["latest_price"] is None
+
+
 def test_predict_with_baseline(client, monkeypatch):
     """Predict endpoint returns baseline data when origin/destination are provided."""
     monkeypatch.setattr(

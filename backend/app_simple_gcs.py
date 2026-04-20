@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """flightwatch api - gcs support, no pandas, python 3.13"""
 from fastapi import FastAPI, Header, HTTPException, Query, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
@@ -564,13 +564,18 @@ async def create_track(
         raise HTTPException(status_code=400, detail="departure_date is required.")
     passengers = _normalize_passenger_count(passengers)
 
-    # Fetch current price from GCS to use as the baseline for future comparisons
-    flights = gcs_data_service_simple.search_flights(
-        origin=origin,
-        destination=destination,
-        departure_date=normalized_departure_date,
-        limit=1,
-    )
+    # Best-effort baseline lookup; tracking should still work even if pricing data is unavailable.
+    flights = []
+    if check_gcs_configured():
+        try:
+            flights = gcs_data_service_simple.search_flights(
+                origin=origin,
+                destination=destination,
+                departure_date=normalized_departure_date,
+                limit=1,
+            )
+        except Exception as exc:
+            print(f"track baseline lookup error: {exc}")
 
     latest_price = None
     if flights:
