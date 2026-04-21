@@ -14,7 +14,7 @@ import hmac
 import os
 import sys
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 from firestore_logic import (
     FirestoreConfigurationError,
     disable_notifications_for_email,
@@ -24,8 +24,9 @@ from firestore_logic import (
     db,
 )
 from gcp_auth import resolve_google_application_credentials
-from date_utils import normalize_date_text
 from unsubscribe_tokens import is_valid_unsubscribe_token
+from date_utils import normalize_date_text
+from datetime import datetime
 import uvicorn
 
 BASE_DIR = os.path.dirname(__file__)
@@ -246,6 +247,20 @@ def _scale_flight_prices(flights: List[Dict[str, Any]], passengers: int) -> List
 
     return scaled_flights
 
+
+def _flight_matches_departure_date(flight: Dict[str, Any], departure_date: Optional[str]) -> bool:
+    if not flight or not departure_date:
+        return False
+
+    flight_date = gcs_data_service_simple._get_field(
+        flight,
+        "departure_datetime",
+        "departure_date",
+        "date",
+        "departure",
+    )[:10]
+    return bool(flight_date and flight_date.startswith(departure_date))
+
 @app.get("/")
 async def root():
     """api info"""
@@ -423,7 +438,6 @@ async def search_flights(
     actual_departure_date = normalize_date_text(departure_date)
     normalized_return_date = normalize_date_text(return_date)
     if not actual_departure_date:
-        from datetime import datetime
         actual_departure_date = datetime.now().strftime("%Y-%m-%d")
     
     if check_gcs_configured():
@@ -436,32 +450,32 @@ async def search_flights(
             )
             
             if flights:
-                scaled_flights = _scale_flight_prices(flights, passengers)
-                # Detect if date fallback was used (flights don't match requested date)
-                date_note = None
-                first_dt = gcs_data_service_simple._get_field(flights[0], 'departure_datetime', 'departure_date', 'date', 'departure')[:10] if flights else ""
-                if first_dt and not first_dt.startswith(actual_departure_date):
-                    dr = gcs_data_service_simple.get_date_range()
-                    range_str = f"{dr['earliest_date']} to {dr['latest_date']}" if dr else "available dates"
-                    date_note = f"Showing closest available flights (data covers {range_str})"
+                has_exact_gcs_match = _flight_matches_departure_date(flights[0], actual_departure_date)
+                if has_exact_gcs_match or not check_amadeus_configured():
+                    scaled_flights = _scale_flight_prices(flights, passengers)
+                    date_note = None
+                    if not has_exact_gcs_match:
+                        dr = gcs_data_service_simple.get_date_range()
+                        range_str = f"{dr['earliest_date']} to {dr['latest_date']}" if dr else "available dates"
+                        date_note = f"Showing closest available flights (data covers {range_str})"
 
-                result = {
-                    "origin": origin,
-                    "destination": destination,
-                    "departure_date": actual_departure_date,
-                    "return_date": normalized_return_date,
-                    "passengers": passengers,
-                    "flights": scaled_flights[:limit],
-                    "source": "gcs",
-                    "count": len(flights),
-                    "status": "success: gcs flight data",
-                    "note": f"found {len(flights)} flights from gcs"
-                }
-                if passengers > 1:
-                    result["pricing_basis"] = "scaled_from_single_passenger_dataset"
-                if date_note:
-                    result["date_note"] = date_note
-                return result
+                    result = {
+                        "origin": origin,
+                        "destination": destination,
+                        "departure_date": actual_departure_date,
+                        "return_date": normalized_return_date,
+                        "passengers": passengers,
+                        "flights": scaled_flights[:limit],
+                        "source": "gcs",
+                        "count": len(flights),
+                        "status": "success: gcs flight data",
+                        "note": f"found {len(flights)} flights from gcs"
+                    }
+                    if passengers > 1:
+                        result["pricing_basis"] = "scaled_from_single_passenger_dataset"
+                    if date_note:
+                        result["date_note"] = date_note
+                    return result
         except Exception as e:
             print(f"gcs search error: {e}")
     
@@ -851,20 +865,50 @@ def format_flight_data(flight_data: List[Dict[str, Any]]) -> List[Dict[str, Any]
     
     return formatted
 
+
+MOCK_ROUTE_DURATIONS_MINUTES = {
+    ("JFK", "LAX"): 380,
+    ("LAX", "JFK"): 320,
+    ("JFK", "SFO"): 390,
+    ("SFO", "JFK"): 330,
+    ("JFK", "ORD"): 155,
+    ("ORD", "JFK"): 135,
+}
+
+
+def _get_mock_duration_minutes(origin: str, destination: str) -> int:
+    return MOCK_ROUTE_DURATIONS_MINUTES.get((origin.upper(), destination.upper()), 180)
+
+
+def _format_duration_minutes(minutes: int) -> str:
+    hours, remainder = divmod(max(int(minutes), 0), 60)
+    if hours and remainder:
+        return f"{hours}h {remainder}m"
+    if hours:
+        return f"{hours}h"
+    return f"{remainder}m"
+
 def get_mock_flights(origin: str, destination: str, departure_date: Optional[str] = None) -> List[Dict[str, Any]]:
     """mock flight data for dev"""
     if not departure_date:
-        from datetime import datetime
         departure_date = datetime.now().strftime("%Y-%m-%d")
+
+    outbound_duration_minutes = _get_mock_duration_minutes(origin, destination)
+    outbound_departure = datetime.fromisoformat(f"{departure_date}T08:00:00")
+    outbound_arrival = outbound_departure + timedelta(minutes=outbound_duration_minutes)
+
+    alternate_duration_minutes = max(60, outbound_duration_minutes + 35)
+    alternate_departure = datetime.fromisoformat(f"{departure_date}T14:00:00")
+    alternate_arrival = alternate_departure + timedelta(minutes=alternate_duration_minutes)
     
     return [
         {
             "id": "mock-1",
             "airline": "American Airlines",
             "flight_number": "AA1234",
-            "departure": f"{departure_date}T08:00:00",
-            "arrival": f"{departure_date}T11:00:00",
-            "duration": "3h",
+            "departure": outbound_departure.isoformat(),
+            "arrival": outbound_arrival.isoformat(),
+            "duration": _format_duration_minutes(outbound_duration_minutes),
             "price": {
                 "total": "299.99",
                 "currency": "USD"
@@ -876,9 +920,9 @@ def get_mock_flights(origin: str, destination: str, departure_date: Optional[str
             "id": "mock-2",
             "airline": "Delta",
             "flight_number": "DL5678",
-            "departure": f"{departure_date}T14:00:00",
-            "arrival": f"{departure_date}T17:00:00",
-            "duration": "3h",
+            "departure": alternate_departure.isoformat(),
+            "arrival": alternate_arrival.isoformat(),
+            "duration": _format_duration_minutes(alternate_duration_minutes),
             "price": {
                 "total": "349.99",
                 "currency": "USD"
