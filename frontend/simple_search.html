@@ -3548,24 +3548,28 @@
         loadAirports();
         loadTrackedFlights();
 
-        // Set default date from available data range (fall back to tomorrow)
+        function getLocalDateInputValue(date = new Date()) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // Set default date to today, while still honoring the earliest available stored date
         (async () => {
+            const picker = document.getElementById('departure-date');
+            const todayValue = getLocalDateInputValue();
+
             try {
                 const resp = await fetch(`${API_BASE}/data-range`);
                 const range = await resp.json();
                 if (range.earliest_date && range.latest_date) {
-                    const earliest = new Date(range.earliest_date + 'T00:00:00');
-                    const latest = new Date(range.latest_date + 'T00:00:00');
-                    const mid = new Date((earliest.getTime() + latest.getTime()) / 2);
-                    const picker = document.getElementById('departure-date');
-                    picker.value = mid.toISOString().split('T')[0];
                     picker.min = range.earliest_date;
+                    picker.value = todayValue >= range.earliest_date ? todayValue : range.earliest_date;
                     return;
                 }
             } catch (e) { /* fall through */ }
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            document.getElementById('departure-date').value = tomorrow.toISOString().split('T')[0];
+            picker.value = todayValue;
         })();
 
         // Auto-fill sample search
