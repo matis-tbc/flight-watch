@@ -63,6 +63,64 @@ def test_search_scales_mock_prices_by_passengers(client, monkeypatch):
     assert data["flights"][0]["price"]["total"] == "300.00"
 
 
+def test_mock_jfk_lax_duration_is_not_hardcoded_to_three_hours():
+    flights = app_simple_gcs.get_mock_flights("JFK", "LAX", "2026-05-01")
+
+    assert len(flights) >= 1
+    assert flights[0]["duration"] == "6h 20m"
+    assert flights[0]["arrival"].startswith("2026-05-01T14:20:00")
+
+
+def test_search_uses_amadeus_when_gcs_only_has_closest_date(client, monkeypatch):
+    monkeypatch.setattr(app_simple_gcs, "check_gcs_configured", lambda: True)
+    monkeypatch.setattr(app_simple_gcs, "check_amadeus_configured", lambda: True)
+    monkeypatch.setattr(
+        app_simple_gcs.gcs_data_service_simple,
+        "search_flights",
+        lambda **kwargs: [{"departure_date": "2026-04-20", "total_price": "180.00"}],
+    )
+    monkeypatch.setattr(
+        app_simple_gcs,
+        "format_flight_data",
+        lambda flights: [{"id": "amadeus-1", "price": {"total": "250.00", "currency": "USD"}}],
+    )
+
+    class FakeAmadeusClient:
+        pass
+
+    monkeypatch.setattr(app_simple_gcs, "_flight_matches_departure_date", lambda flight, departure_date: False)
+
+    original_import = __import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "flight_fetcher":
+            class FakeModule:
+                @staticmethod
+                def authenticate_amadeus():
+                    return FakeAmadeusClient()
+
+                @staticmethod
+                def search_flights(amadeus_client, origin, destination, departure_date, return_date, passengers):
+                    assert departure_date == "2026-04-21"
+                    return [{"id": "raw-amadeus"}]
+
+            return FakeModule()
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr("builtins.__import__", fake_import)
+
+    response = client.get("/api/search", params={
+        "origin": "JFK",
+        "destination": "LAX",
+        "departure_date": "2026-04-21",
+    })
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["source"] == "amadeus"
+    assert data["departure_date"] == "2026-04-21"
+
+
 def test_search_missing_params(client):
     response = client.get("/api/search")
     assert response.status_code == 422

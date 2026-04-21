@@ -3078,7 +3078,7 @@
                 const destination = flight.destination || data.destination;
                 const departure = flight.departure_datetime || flight.departure;
                 const arrival = flight.arrival_datetime || flight.arrival;
-                const duration = formatDuration(flight.duration);
+                const duration = formatDuration(flight.duration, departure, arrival);
                 const aircraft = flight.aircraft || 'N/A';
                 const headerAircraftText = `${airline} ${flightNum}`.trim() || 'N/A';
                 const aircraftDisplay = aircraft && aircraft !== 'N/A' ? aircraft : headerAircraftText;
@@ -3168,7 +3168,10 @@
             });
         }
 
-        function formatDuration(durationValue) {
+        function formatDuration(durationValue, departureDateTime = null, arrivalDateTime = null) {
+            const derivedDuration = formatDurationFromDateTimes(departureDateTime, arrivalDateTime);
+            if (derivedDuration) return derivedDuration;
+
             if (!durationValue) return 'Duration unavailable';
 
             const text = String(durationValue).trim();
@@ -3205,6 +3208,23 @@
         }
 
         // ── Budget Explorer ──────────────────────────────────────────────
+        function formatDurationFromDateTimes(departureDateTime, arrivalDateTime) {
+            if (!departureDateTime || !arrivalDateTime) return '';
+
+            const departure = new Date(departureDateTime);
+            const arrival = new Date(arrivalDateTime);
+            if (Number.isNaN(departure.getTime()) || Number.isNaN(arrival.getTime())) return '';
+
+            const diffMinutes = Math.round((arrival.getTime() - departure.getTime()) / 60000);
+            if (!Number.isFinite(diffMinutes) || diffMinutes <= 0) return '';
+
+            const hours = Math.floor(diffMinutes / 60);
+            const minutes = diffMinutes % 60;
+            if (hours && minutes) return `${hours}h ${minutes}m`;
+            if (hours) return `${hours}h`;
+            return `${minutes}m`;
+        }
+
         let explorerMap = null;
         let explorerMarkers = [];
         let explorerDestGeoData = {};
@@ -3464,7 +3484,7 @@
                 const sf = dest.sample_flight || {};
                 const depTime = sf.departure_datetime ? formatDateTime(sf.departure_datetime) : '';
                 const arrTime = sf.arrival_datetime ? formatDateTime(sf.arrival_datetime) : '';
-                const duration = sf.duration || '';
+                const duration = formatDuration(sf.duration, sf.departure_datetime, sf.arrival_datetime);
                 const aircraft = sf.aircraft || '';
                 const flightNum = sf.flight_number || '';
 
@@ -3479,7 +3499,7 @@
                         <div class="dest-detail">
                             ${depTime ? `<div class="dest-detail-row"><span>Departs</span><span>${escapeHtml(depTime)}</span></div>` : ''}
                             ${arrTime ? `<div class="dest-detail-row"><span>Arrives</span><span>${escapeHtml(arrTime)}</span></div>` : ''}
-                            ${duration ? `<div class="dest-detail-row"><span>Duration</span><span>${escapeHtml(duration)}</span></div>` : ''}
+                            ${duration && duration !== 'Duration unavailable' ? `<div class="dest-detail-row"><span>Duration</span><span>${escapeHtml(duration)}</span></div>` : ''}
                             <button class="dest-search-btn" data-origin="${escapeHtml(data.origin)}" data-dest="${escapeHtml(dest.destination)}">Search this route</button>
                         </div>
                     </div>
@@ -3540,7 +3560,6 @@
                     const picker = document.getElementById('departure-date');
                     picker.value = mid.toISOString().split('T')[0];
                     picker.min = range.earliest_date;
-                    picker.max = range.latest_date;
                     return;
                 }
             } catch (e) { /* fall through */ }
